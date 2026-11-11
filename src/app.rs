@@ -15,6 +15,10 @@ use std::sync::Arc;
 use zeroize::Zeroizing;
 
 const STATIC_SECS: f64 = 0.45;
+/// Give up reconnecting to a program after this many tries (it stays on "stand by").
+const MAX_LOAD_ATTEMPTS: u32 = 8;
+/// A load that hasn't shown a picture after this long is restarted.
+const STUCK_SECS: f64 = 25.0;
 /// Guide zoom levels: how much time the grid shows at once.
 const GUIDE_SPANS: &[(f64, &str)] = &[(1800.0, "30 min"), (3600.0, "1 hr"), (7200.0, "2 hr"), (4.0 * 3600.0, "4 hr")];
 
@@ -34,6 +38,9 @@ pub struct RetroRabbit {
     loaded: Option<(String, f64)>,
     /// When the program that's playing ends (unix seconds).
     loaded_end: f64,
+    /// Tries at loading the current program, and when the last one started (egui time).
+    load_attempts: u32,
+    load_at: f64,
     player: Option<Player>,
     video: Option<VideoWindow>,
     /// Second, audio-only mpv for the static hiss.
@@ -113,6 +120,8 @@ impl RetroRabbit {
             previous: 0,
             loaded: None,
             loaded_end: 0.0,
+            load_attempts: 0,
+            load_at: 0.0,
             player,
             video,
             hiss,
@@ -430,6 +439,26 @@ impl RetroRabbit {
                     p.load(&s.media.source, wall - s.start);
                     self.loaded = Some(key);
                     self.loaded_end = s.end;
+                    self.load_attempts = 1;
+                    self.load_at = self.time;
+                } else if self.load_attempts < MAX_LOAD_ATTEMPTS {
+                    // archive.org sometimes drops a connection or stalls. Reconnect on
+                    // our own (2, 4, 8, then every 15 s), picking up where the show is now.
+                    let st = p.state();
+                    let since = self.time - self.load_at;
+                    let backoff = match self.load_attempts {
+                        1 => 2.0,
+                        2 => 4.0,
+                        3 => 8.0,
+                        _ => 15.0,
+                    };
+                    let failed = st.ended && st.error.is_some() && since >= backoff;
+                    let stuck = !st.playing && !st.ended && since >= STUCK_SECS;
+                    if failed || stuck {
+                        p.load(&s.media.source, wall - s.start);
+                        self.load_attempts += 1;
+                        self.load_at = self.time;
+                    }
                 }
             }
         }
@@ -707,7 +736,12 @@ impl RetroRabbit {
             }
         } else if pstate.as_ref().is_some_and(|s| s.ended) {
             self.tuning = false;
-            let sub = pstate.and_then(|s| s.error).unwrap_or_else(|| "Back after this program ends.".into());
+            let st = pstate.unwrap_or_default();
+            let sub = match st.error {
+                Some(_) if self.load_attempts < MAX_LOAD_ATTEMPTS => "Signal lost. Reconnecting…".to_string(),
+                Some(e) => format!("This program can't be shown right now ({e}). Back after it ends."),
+                None => "Back after this program ends.".to_string(),
+            };
             win95::color_bars(&p, screen, "PLEASE STAND BY", &sub);
         } else if !pstate.as_ref().is_some_and(|s| s.playing) {
             // Loading. After a channel change: static until the picture arrives.
@@ -1118,6 +1152,7 @@ impl RetroRabbit {
                                 Rule::Archive(q) => {
                                     let presets = schedule::ARCHIVE_PRESETS.iter().map(|p| p.1.to_string()).collect();
                                     pick_text(ui, ("ia", i), q, presets, 330.0);
+                                    ui.label("(?)").on_hover_text("An archive.org search, e.g. collection:classic_cartoons or subject:(western).\nAdd max:30 to skip anything longer than 30 minutes.");
                                     match self.archive.state(q) {
                                         Some(ArchiveState::Queued) => {
                                             ui.label("waiting…");

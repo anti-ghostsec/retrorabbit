@@ -206,7 +206,13 @@ pub const ARCHIVE_PRESETS: &[(&str, &str, Order)] = &[
     ("Creature Feature", "collection:SciFi_Horror", Order::Shuffle),
     ("Comedy Matinee", "collection:Comedy_Films", Order::Shuffle),
     ("Educational Films", "collection:prelinger", Order::Shuffle),
-    ("Commercial Break", "collection:classic_tv_commercials", Order::Shuffle),
+    // The collection also has whole broadcasts with the ads left in: keep it to
+    // things titled or tagged as commercials, and nothing over 10 minutes.
+    (
+        "Commercial Break",
+        "collection:classic_tv_commercials AND (title:(commercial OR commercials OR ad OR ads OR advert*) OR subject:(commercial OR commercials OR advertising)) max:10",
+        Order::Shuffle,
+    ),
     ("Midnight Movies", "(collection:SciFi_Horror AND year:[1950 TO 1969]) OR creator:(ed wood)", Order::Shuffle),
     ("Film Noir", "collection:Film_Noir", Order::Shuffle),
     ("Silent Era", "collection:silent_films", Order::Shuffle),

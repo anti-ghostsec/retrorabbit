@@ -27,7 +27,8 @@ Everything has a Windows 95 look.
   and date), folder names, and episode names like `Show.S02E05.mkv`.
 - **Channels are rules, not playlists.** A channel airs anything matching a
   folder, a tag (`genre = horror`, `decade = 1980s`), a show, an Internet Archive
-  search, or what you've liked. Shuffle, or in order for episodes.
+  search, or what you've liked. Shuffle, or in order for episodes. Add `max:30` to
+  an Internet Archive search to skip anything longer than 30 minutes.
 - **TV guide.** A scrolling program grid with zoom (30 min to 4 hours), paging
   through time, and click-to-tune.
 - **Favorites.** Star channels and surf favorites only, or press Like on anything
@@ -107,7 +108,8 @@ retrorabbit [OPTIONS] [FOLDER...]
   end, starting over (reshuffled) when it runs out. "Now" is just
   `(time since the epoch) mod (playlist length)`, so no schedule is ever saved.
 - **Internet Archive.** Each channel takes the 40 most-downloaded videos in its
-  search, plus 80 picked at random from the next 1,000. The random pick is seeded
+  search, plus 80 picked at random from the next 1,000. If a stream drops,
+  RetroRabbit reconnects on its own and picks up where the show is now. The random pick is seeded
   by the search, so it's the same on every run. Every channel loads a starter set
   first, so the whole guide fills in quickly, then the rest arrives in the
   background.

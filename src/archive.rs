@@ -231,8 +231,26 @@ fn agent() -> ureq::Agent {
         .build()
 }
 
+/// Splits RetroRabbit's own options off a search. `max:30` skips anything
+/// longer than 30 minutes (archive.org's search can't filter by length).
+pub fn split_options(query: &str) -> (String, Option<f64>) {
+    let mut max = None;
+    let rest: Vec<&str> = query
+        .split_whitespace()
+        .filter(|w| match w.strip_prefix("max:").and_then(|m| m.trim_end_matches('m').parse::<f64>().ok()) {
+            Some(mins) => {
+                max = Some(mins * 60.0);
+                false
+            }
+            None => true,
+        })
+        .collect();
+    (rest.join(" "), max)
+}
+
 /// Item identifiers for a search, most downloaded first.
 fn search(query: &str) -> Result<Vec<String>, String> {
+    let (query, _) = split_options(query);
     let q = format!("({query}) AND mediatype:movies");
     let url = format!(
         "https://archive.org/advancedsearch.php?q={}&fl[]=identifier&sort[]=downloads+desc&rows={}&output=json",
@@ -321,7 +339,8 @@ fn item_media(agent: &ureq::Agent, id: &str, query: &str) -> Result<Vec<Media>, 
         .filter_map(|f| {
             let name = f["name"].as_str()?;
             let duration = length(f)?;
-            if !(10.0..=4.0 * 3600.0).contains(&duration) {
+            let max = split_options(query).1.unwrap_or(4.0 * 3600.0);
+            if !(10.0..=max).contains(&duration) {
                 return None;
             }
             let title = if multi {
@@ -383,6 +402,13 @@ mod tests {
     /// Loads every preset channel from archive.org and reports timing.
     /// Network test: `cargo test -- --ignored --nocapture load_all_presets`
     #[test]
+    fn options() {
+        assert_eq!(split_options("collection:x max:30"), ("collection:x".to_string(), Some(1800.0)));
+        assert_eq!(split_options("max:5m collection:x"), ("collection:x".to_string(), Some(300.0)));
+        assert_eq!(split_options("collection:x"), ("collection:x".to_string(), None));
+    }
+
+    #[test]
     #[ignore]
     fn load_all_presets() {
         let a = Archive::new();
@@ -403,5 +429,26 @@ mod tests {
             eprintln!("{name:22} {:?} {} videos", a.state(q).unwrap(), a.items(q).len());
         }
         eprintln!("all {} channels on the air in {on_air:.0?}, fully loaded in {:.0?}", presets.len(), t0.elapsed());
+    }
+}
+
+#[cfg(test)]
+mod one_channel {
+    use super::*;
+
+    /// `RR_QUERY='…' cargo test -- --ignored --nocapture load_one`
+    #[test]
+    #[ignore]
+    fn load_one() {
+        let q = std::env::var("RR_QUERY").expect("set RR_QUERY");
+        let a = Archive::new();
+        a.request(&q, Arc::new(|| {}));
+        while *a.workers.lock().unwrap() > 0 || matches!(a.state(&q), Some(State::Queued)) {
+            std::thread::sleep(Duration::from_millis(250));
+        }
+        let items = a.items(&q);
+        let longest = items.iter().map(|m| m.duration).fold(0.0, f64::max);
+        let total: f64 = items.iter().map(|m| m.duration).sum();
+        eprintln!("{:?}: {} videos, longest {:.1} min, {:.1} h total", a.state(&q).unwrap(), items.len(), longest / 60.0, total / 3600.0);
     }
 }
