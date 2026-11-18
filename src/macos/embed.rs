@@ -10,6 +10,9 @@ use std::ffi::{CStr, c_char, c_void};
 /// mpv settings for the video core (the Linux build passes the same on mpv's command line).
 pub const VIDEO_OPTIONS: &[&str] = &[
     "vo=libmpv",
+    // Cheap scaling (bilinear, no dithering): plenty for old SD films, and it keeps
+    // up even on Macs without a GPU (the default shaders stall there).
+    "profile=fast",
     "idle=yes",
     "keep-open=no",
     "config=no",
