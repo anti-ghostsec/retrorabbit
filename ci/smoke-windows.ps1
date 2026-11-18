@@ -48,10 +48,16 @@ if (Test-Path $mpvcom) {
   $video = Get-ChildItem -Path $Media -Recurse -Filter *.mp4 | Select-Object -First 1
   $play = $opts[1..($opts.Count - 1)] | Where-Object { $_ -ne "--force-window=no" -and $_ -ne "--idle=yes" }
   $play += @("--force-window=yes", "--length=6", "--log-file=$(Join-Path $Out 'mpv-play-log.txt')", "`"$($video.FullName)`"")
-  $v = Start-Process -FilePath $mpvcom -ArgumentList $play -PassThru -NoNewWindow -Wait `
-    -RedirectStandardOutput (Join-Path $Out "mpv-play.txt") -RedirectStandardError (Join-Path $Out "mpv-play-err.txt")
-  "mpv play test: exit=$($v.ExitCode)"
-  Get-Content (Join-Path $Out "mpv-play-log.txt") -ErrorAction SilentlyContinue | Select-String -Pattern "error|fail|vo/|Using|crash" | Select-Object -Last 25
+  # The runner has no GPU (only Microsoft's software Direct3D): find a renderer
+  # mpv gets along with here, and hand it to RetroRabbit.
+  foreach ($vo in @("", "--vo=gpu", "--vo=gpu --gpu-api=opengl", "--vo=direct3d")) {
+    $args2 = $play + ($vo -split " " | Where-Object { $_ })
+    $v = Start-Process -FilePath $mpvcom -ArgumentList $args2 -PassThru -NoNewWindow -Wait `
+      -RedirectStandardOutput (Join-Path $Out "mpv-play.txt") -RedirectStandardError (Join-Path $Out "mpv-play-err.txt")
+    "mpv play test [$vo]: exit=$($v.ExitCode)"
+    if ($v.ExitCode -eq 0) { $env:RETRORABBIT_MPV_ARGS = $vo; break }
+  }
+  "RETRORABBIT_MPV_ARGS=$env:RETRORABBIT_MPV_ARGS"
   Get-Content (Join-Path $Out "mpv-test.txt"), (Join-Path $Out "mpv-test-err.txt") -ErrorAction SilentlyContinue | Select-Object -Last 30
 }
 $p = Start-Process -FilePath (Join-Path $Dir "retrorabbit.exe") -ArgumentList "--channel", "2", "`"$Media`"" -PassThru `

@@ -195,6 +195,11 @@ impl Player {
             use std::os::windows::process::CommandExt;
             let mut c = Command::new(tool("mpv"));
             c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+            // Extra mpv options, e.g. RETRORABBIT_MPV_ARGS=--vo=gpu for graphics
+            // drivers mpv's default renderer doesn't get along with.
+            if let Ok(extra) = std::env::var("RETRORABBIT_MPV_ARGS") {
+                c.args(extra.split_whitespace());
+            }
             c
         };
         let child = cmd
