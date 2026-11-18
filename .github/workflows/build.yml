@@ -23,8 +23,13 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo apt-get update -qq
-          sudo -E apt-get install -y -q --no-install-recommends -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
-            mpv ffmpeg xvfb xauth xdotool libgl1-mesa-dri libegl1 libxkbcommon-x11-0 </dev/null
+          # The runners' Ubuntu mirror sometimes stalls: give each try 5 minutes.
+          for try in 1 2 3; do
+            timeout 300 sudo -E apt-get install -y -q --no-install-recommends -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
+              mpv ffmpeg xvfb xauth xdotool libgl1-mesa-dri libegl1 libxkbcommon-x11-0 </dev/null && break
+            echo "apt try $try failed"
+            [ "$try" = 3 ] && exit 1
+          done
       - name: Smoke test (Xvfb, silent test media)
         timeout-minutes: 10
         run: ci/smoke-linux.sh target/release/retrorabbit smoke
