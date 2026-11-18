@@ -9,7 +9,6 @@ use eframe::egui::{
     self, Align2, Color32, ColorImage, FontId, Key, Rect, Sense, TextureHandle, TextureOptions, Ui,
     ViewportBuilder, ViewportCommand, ViewportId, pos2, vec2,
 };
-use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use std::collections::HashMap;
 use std::sync::Arc;
 use zeroize::Zeroizing;
@@ -84,22 +83,18 @@ impl RetroRabbit {
         let ctx = cc.egui_ctx.clone();
         let repaint: Repaint = Arc::new(move || ctx.request_repaint());
 
-        // Embed mpv in our window (X11 only for now).
-        let parent = cc.window_handle().ok().and_then(|h| match h.as_raw() {
-            RawWindowHandle::Xlib(x) => Some(x.window as u32),
-            RawWindowHandle::Xcb(x) => Some(x.window.get()),
-            _ => None,
-        });
+        // Embed the video in our window (an X11 child window on Linux).
+        let parent = crate::embed::parent(cc);
         let mut lineup = Lineup::default();
         let args = crate::Args::parse();
         if !args.folders.is_empty() {
             lineup.media_roots = args.folders.clone();
         }
         let (video, player, player_error) = match parent {
-            None => (None, None, Some("Video needs an X11 session (or XWayland).".to_string())),
-            Some(parent) => match VideoWindow::new(parent) {
+            Err(e) => (None, None, Some(e)),
+            Ok(parent) => match VideoWindow::new(parent) {
                 Err(e) => (None, None, Some(format!("Couldn't make the video window: {e}"))),
-                Ok(v) => match Player::spawn(v.id, lineup.volume, lineup.even_volume) {
+                Ok(v) => match Player::spawn(v.handle(), lineup.volume, lineup.even_volume) {
                     Ok(p) => (Some(v), Some(p), None),
                     Err(e) => (Some(v), None, Some(e)),
                 },
@@ -763,14 +758,7 @@ impl RetroRabbit {
         }
 
         if let Some(v) = &mut self.video {
-            let ppp = ui.ctx().pixels_per_point();
-            v.set_geometry(
-                (screen.min.x * ppp).round() as i32,
-                (screen.min.y * ppp).round() as i32,
-                (screen.width() * ppp).round() as u32,
-                (screen.height() * ppp).round() as u32,
-            );
-            v.set_visible(show_video);
+            v.show(ui, screen, show_video);
         }
         // Static on screen ⇒ static in the speakers.
         if self.static_this_frame != self.hiss_on {
@@ -1308,8 +1296,11 @@ impl RetroRabbit {
 }
 
 impl eframe::App for RetroRabbit {
-    fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        if let Some(v) = &mut self.video {
+            v.prepare(frame);
+        }
         self.time = ctx.input(|i| i.time);
         let wall = unix_now();
 
@@ -1390,10 +1381,13 @@ pub fn unix_now() -> f64 {
 
 fn local_hm(t: f64) -> String {
     let tt = t as libc::time_t;
-    // SAFETY: localtime_r only writes into the tm we pass it.
+    // SAFETY: localtime_r/_s only write into the tm we pass them.
     let tm = unsafe {
         let mut tm: libc::tm = std::mem::zeroed();
+        #[cfg(not(windows))]
         libc::localtime_r(&tt, &mut tm);
+        #[cfg(windows)]
+        libc::localtime_s(&mut tm, &tt);
         tm
     };
     let h = tm.tm_hour % 12;

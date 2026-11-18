@@ -1,9 +1,11 @@
 //! Video playback by the system `mpv`, drawn inside our window (`--wid`) and
 //! driven over its JSON IPC socket. The socket lives in $XDG_RUNTIME_DIR (tmpfs),
 //! mpv's cache is RAM-only, and resume/watch-later files are switched off.
+//! On Windows the socket is a named pipe and mpv.exe is looked for next to ours.
 
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
+#[cfg(unix)]
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -23,9 +25,15 @@ pub struct PlayerState {
     pub error: Option<String>,
 }
 
+#[cfg(unix)]
+type Conn = UnixStream;
+#[cfg(windows)]
+type Conn = std::fs::File;
+
 pub struct Player {
     child: Child,
-    sock: UnixStream,
+    sock: Conn,
+    #[cfg_attr(windows, allow(dead_code))]
     path: PathBuf,
     state: Arc<Mutex<PlayerState>>,
 }
@@ -36,12 +44,53 @@ const HISS: &str = "av://lavfi:anoisesrc=color=white:amplitude=0.5,lowpass=f=700
 /// Static is quieter than programs, like on a real set.
 const HISS_LEVEL: f64 = 0.35;
 
+#[cfg(unix)]
 fn socket_path(tag: &str) -> PathBuf {
     let dir = std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
         .filter(|d| d.is_dir())
         .unwrap_or_else(|| PathBuf::from("/dev/shm"));
     dir.join(format!("retrorabbit-{}{tag}.sock", std::process::id()))
+}
+
+#[cfg(windows)]
+fn socket_path(tag: &str) -> PathBuf {
+    PathBuf::from(format!(r"\\.\pipe\retrorabbit-{}{tag}", std::process::id()))
+}
+
+/// Two connections to mpv's control socket: one we write commands to, one the
+/// event thread reads. (A Windows pipe handle can't read and write at once.)
+#[cfg(unix)]
+fn connect(path: &std::path::Path) -> std::io::Result<(Conn, Conn)> {
+    let s = UnixStream::connect(path)?;
+    let r = s.try_clone()?;
+    Ok((s, r))
+}
+
+#[cfg(windows)]
+fn connect(path: &std::path::Path) -> std::io::Result<(Conn, Conn)> {
+    let open = || std::fs::OpenOptions::new().read(true).write(true).open(path);
+    let w = open()?;
+    // mpv makes a new pipe instance for the next client just after accepting one.
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let r = loop {
+        match open() {
+            Ok(r) => break r,
+            Err(_) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
+            Err(e) => return Err(e),
+        }
+    };
+    Ok((w, r))
+}
+
+/// mpv.exe next to retrorabbit.exe if it's there (the Windows download ships it), else PATH.
+#[cfg(windows)]
+pub fn tool(name: &str) -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(|d| d.join(format!("{name}.exe"))))
+        .filter(|p| p.is_file())
+        .unwrap_or_else(|| PathBuf::from(name))
 }
 
 /// mpv settings shared by the video player and the static hiss.
@@ -66,6 +115,7 @@ const COMMON: &[&str] = &[
 ];
 
 /// Remove sockets left behind by RetroRabbit instances that crashed.
+#[cfg(unix)]
 fn clean_stale_sockets(dir: &std::path::Path) {
     let Ok(rd) = std::fs::read_dir(dir) else { return };
     for e in rd.flatten() {
@@ -83,7 +133,7 @@ fn clean_stale_sockets(dir: &std::path::Path) {
 }
 
 impl Player {
-    pub fn spawn(wid: u32, volume: f64, even_volume: bool) -> Result<Self, String> {
+    pub fn spawn(wid: impl std::fmt::Display, volume: f64, even_volume: bool) -> Result<Self, String> {
         Self::launch(
             "",
             &[
@@ -131,11 +181,23 @@ impl Player {
 
     fn launch(tag: &str, args: &[String], fixed: &[&str]) -> Result<Self, String> {
         let path = socket_path(tag);
-        if let Some(dir) = path.parent() {
-            clean_stale_sockets(dir);
+        #[cfg(unix)]
+        {
+            if let Some(dir) = path.parent() {
+                clean_stale_sockets(dir);
+            }
+            let _ = std::fs::remove_file(&path);
         }
-        let _ = std::fs::remove_file(&path);
-        let child = Command::new("mpv")
+        #[cfg(unix)]
+        let mut cmd = Command::new("mpv");
+        #[cfg(windows)]
+        let mut cmd = {
+            use std::os::windows::process::CommandExt;
+            let mut c = Command::new(tool("mpv"));
+            c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+            c
+        };
+        let child = cmd
             .arg(format!("--input-ipc-server={}", path.display()))
             .args(args)
             .args(COMMON)
@@ -147,8 +209,8 @@ impl Player {
             .map_err(|e| format!("couldn't start mpv: {e}"))?;
 
         let deadline = Instant::now() + Duration::from_secs(5);
-        let sock = loop {
-            match UnixStream::connect(&path) {
+        let (sock, reader) = loop {
+            match connect(&path) {
                 Ok(s) => break s,
                 Err(_) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(50)),
                 Err(e) => return Err(format!("mpv didn't open its control socket: {e}")),
@@ -156,7 +218,6 @@ impl Player {
         };
 
         let state = Arc::new(Mutex::new(PlayerState::default()));
-        let reader = sock.try_clone().map_err(|e| e.to_string())?;
         let st = state.clone();
         std::thread::spawn(move || {
             for line in BufReader::new(reader).lines() {
@@ -246,6 +307,7 @@ impl Drop for Player {
         }
         let _ = self.child.kill();
         let _ = self.child.wait();
+        #[cfg(unix)]
         let _ = std::fs::remove_file(&self.path);
     }
 }

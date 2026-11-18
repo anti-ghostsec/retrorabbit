@@ -163,8 +163,32 @@ fn is_video(p: &Path) -> bool {
         .unwrap_or(false)
 }
 
+#[cfg(not(any(windows, target_os = "macos", target_os = "android")))]
+fn ffprobe() -> Command {
+    Command::new("ffprobe")
+}
+
+/// The Windows and macOS downloads ship ffprobe next to RetroRabbit; else use PATH.
+#[cfg(any(windows, target_os = "macos"))]
+fn ffprobe() -> Command {
+    let name = if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" };
+    let exe = std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(|d| d.join(name)))
+        .filter(|p| p.is_file())
+        .unwrap_or_else(|| PathBuf::from(name));
+    #[allow(unused_mut)]
+    let mut c = Command::new(exe);
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(&mut c, 0x0800_0000); // CREATE_NO_WINDOW
+    c
+}
+
 fn probe(root: &Path, path: &Path) -> Option<Media> {
-    let out = Command::new("ffprobe")
+    #[cfg(target_os = "android")]
+    let out = crate::android::probe(path)?;
+    #[cfg(not(target_os = "android"))]
+    let out = ffprobe()
         .args(["-v", "quiet", "-print_format", "json", "-show_format", "--"])
         .arg(path)
         .stdin(Stdio::null())

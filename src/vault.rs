@@ -13,6 +13,10 @@ use zeroize::Zeroizing;
 const MAGIC: &[u8; 4] = b"RRV1";
 
 pub fn default_path() -> PathBuf {
+    #[cfg(target_os = "android")]
+    if let Some(d) = crate::android::data_dir() {
+        return d.join("lineup.rrv");
+    }
     dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("retrorabbit").join("lineup.rrv")
 }
 
@@ -72,14 +76,12 @@ pub fn load(pass: &str, path: &PathBuf) -> Result<Lineup, String> {
 
 fn write_private(path: &PathBuf, data: &[u8]) -> Result<(), String> {
     use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    let mut f = std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(path)
-        .map_err(|e| e.to_string())?;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    // Windows: the per-user profile folder's own permissions keep it private.
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+    let mut f = opts.open(path).map_err(|e| e.to_string())?;
     f.write_all(data).map_err(|e| e.to_string())
 }
 

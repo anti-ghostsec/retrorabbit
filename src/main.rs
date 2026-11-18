@@ -1,7 +1,20 @@
+// Release builds on Windows open no console window.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod app;
 mod archive;
+// Video: an X11 child window + mpv on Linux, a Win32 child window + mpv on
+// Windows, libmpv rendering into an OpenGL texture on macOS.
+#[cfg_attr(windows, path = "windows/embed.rs")]
+#[cfg_attr(target_os = "macos", path = "macos/embed.rs")]
 mod embed;
+#[cfg(target_os = "macos")]
+mod gltex;
 mod library;
+#[cfg(target_os = "macos")]
+#[path = "macos/mpv.rs"]
+mod mpv;
+#[cfg_attr(target_os = "macos", path = "macos/player.rs")]
 mod player;
 mod schedule;
 mod vault;

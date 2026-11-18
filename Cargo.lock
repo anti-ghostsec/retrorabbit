@@ -2036,10 +2036,12 @@ dependencies = [
  "dirs",
  "eframe",
  "libc",
+ "libloading",
  "raw-window-handle",
  "serde",
  "serde_json",
  "ureq",
+ "windows-sys 0.59.0",
  "x11rb",
  "zeroize",
 ]
