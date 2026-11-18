@@ -57,6 +57,42 @@ RetroRabbit keeps everything in memory:
 
 ## Install
 
+RetroRabbit runs on Linux, Windows, macOS and Android TV. Builds for each come
+from GitHub Actions (see the Actions tab).
+
+### Windows
+
+Download `retrorabbit-windows-x86_64`, unzip it and run `retrorabbit.exe`.
+`mpv.exe` and `ffprobe.exe` are included (see `THIRD-PARTY.txt`). Your channel
+lineup, if you save one, goes in `%APPDATA%\retrorabbit`.
+
+### macOS
+
+Download `RetroRabbit-macos-arm64.zip` (Apple silicon) or `-x86_64.zip` (Intel),
+unzip it and move RetroRabbit to Applications. libmpv and ffprobe are inside the
+app. It isn't notarized, so the first time, right-click it and choose **Open**.
+It needs macOS 15 (Sequoia) or newer.
+
+### Android TV
+
+Install `RetroRabbit-android-tv.apk` (for example with `adb install`, or a file
+manager on the TV). It shows up on the TV home screen. Allow access to videos
+and it makes channels from the TV's `Movies` and `Download` folders too.
+
+| Remote button | Does |
+| --- | --- |
+| Up / Down, Channel + / − | Change channel |
+| 0–9 | Type a channel number |
+| Back | Last channel (or close the guide / channel editor / toolbar) |
+| OK | Show the toolbar (then arrows and OK work its buttons) |
+| Guide or Menu | TV guide |
+| Info | What's on |
+| Red / Green / Yellow / Blue | Like / favorite channel / favorites only / channel editor |
+
+In the channel editor, choosing a text box brings up the TV's keyboard.
+
+### Linux
+
 You need:
 
 - Rust (stable)
@@ -113,7 +149,11 @@ retrorabbit [OPTIONS] [FOLDER...]
   by the search, so it's the same on every run. Every channel loads a starter set
   first, so the whole guide fills in quickly, then the rest arrives in the
   background.
-- **Video.** The system `mpv` draws into a window embedded in RetroRabbit's own,
+- **Video.** On Linux and Windows, `mpv` draws into a window embedded in
+  RetroRabbit's own (an X11 or Win32 child window), controlled over its IPC socket
+  (a named pipe on Windows). macOS can't embed another program's window, so there
+  libmpv runs inside RetroRabbit and renders into an OpenGL texture. On Android TV,
+  ExoPlayer decodes into a texture, and the static hiss is made by RetroRabbit.
   controlled over its IPC socket.
 - **UI.** [egui](https://github.com/emilk/egui), styled as Windows 95.
 

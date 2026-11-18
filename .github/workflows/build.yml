@@ -17,10 +17,20 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --locked
       - run: cargo build --release --locked
+      - name: Smoke test (Xvfb, silent test media)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mpv ffmpeg xvfb xdotool imagemagick >/dev/null
+          ci/smoke-linux.sh target/release/retrorabbit smoke
       - uses: actions/upload-artifact@v4
         with:
           name: retrorabbit-linux-x86_64
           path: target/release/retrorabbit
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-linux
+          path: smoke
 
   windows:
     runs-on: windows-2022
@@ -29,13 +39,49 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --locked
       - run: cargo build --release --locked
+      - name: Package with mpv and ffprobe
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mpv_url=$(gh api repos/shinchiro/mpv-winbuild-cmake/releases/latest \
+            --jq '.assets[] | select(.name | test("^mpv-x86_64-[0-9].*\\.7z$")) | .browser_download_url' | head -1)
+          echo "mpv: $mpv_url"
+          curl -fsSL -o mpv.7z "$mpv_url"
+          7z x -y -ompv mpv.7z >/dev/null
+          curl -fsSL -o ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip
+          7z x -y -offmpeg ffmpeg.zip >/dev/null
+          d=dist/RetroRabbit
+          mkdir -p "$d"
+          cp target/release/retrorabbit.exe README.md LICENSE "$d/"
+          cp mpv/mpv.exe "$d/"
+          cp ffmpeg/*/bin/ffprobe.exe "$d/"
+          cp ffmpeg/*/LICENSE.txt "$d/ffprobe-LICENSE.txt" || true
+          cat > "$d/THIRD-PARTY.txt" <<TXT
+          mpv.exe: mpv (GPL-2.0-or-later), build from https://github.com/shinchiro/mpv-winbuild-cmake
+            ($mpv_url). Source: https://github.com/mpv-player/mpv
+          ffprobe.exe: FFmpeg (LGPL-2.1-or-later), build from https://github.com/BtbN/FFmpeg-Builds
+            (ffmpeg-master-latest-win64-lgpl). Source: https://ffmpeg.org
+          RetroRabbit only runs these as separate programs.
+          TXT
+          ci/make-test-media.sh "$PWD/testmedia" "$(ls ffmpeg/*/bin/ffmpeg.exe)"
+      - name: Smoke test
+        shell: pwsh
+        run: ci/smoke-windows.ps1 -Dir dist/RetroRabbit -Media "$PWD/testmedia" -Out smoke
       - uses: actions/upload-artifact@v4
         with:
           name: retrorabbit-windows-x86_64
-          path: target/release/retrorabbit.exe
+          path: dist
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-windows
+          path: smoke
 
   macos:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner: macos-15
@@ -48,10 +94,22 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --locked
       - run: cargo build --release --locked
+      - name: Bundle RetroRabbit.app with libmpv and ffprobe
+        run: |
+          brew install --quiet mpv dylibbundler
+          ci/bundle-macos.sh target/release/retrorabbit dist/RetroRabbit.app "$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
+          ditto -c -k --keepParent dist/RetroRabbit.app dist/RetroRabbit-macos-${{ matrix.arch }}.zip
+      - name: Smoke test
+        run: ci/smoke-macos.sh dist/RetroRabbit.app smoke
       - uses: actions/upload-artifact@v4
         with:
           name: retrorabbit-macos-${{ matrix.arch }}
-          path: target/release/retrorabbit
+          path: dist/RetroRabbit-macos-${{ matrix.arch }}.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-macos-${{ matrix.arch }}
+          path: smoke
 
   android:
     runs-on: ubuntu-24.04
@@ -70,15 +128,43 @@ jobs:
           workspaces: android/rust
       - name: Build the Rust library for each ABI
         working-directory: android/rust
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
-        run: cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -t x86 -P 28 -o ../app/src/main/jniLibs build --release
+        run: ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -t x86 -P 28 -o ../app/src/main/jniLibs build --release
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
       - name: Build the APK
         run: gradle -p android assembleRelease --no-daemon
+      - run: mv android/app/build/outputs/apk/release/*.apk RetroRabbit-android-tv.apk
       - uses: actions/upload-artifact@v4
         with:
           name: retrorabbit-android-tv
-          path: android/app/build/outputs/apk/release/*.apk
+          path: RetroRabbit-android-tv.apk
+
+  android-tv-emulator:
+    needs: android
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: retrorabbit-android-tv
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
+      - name: Smoke test on an Android TV emulator (no audio)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: android-tv
+          arch: x86
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim -camera-back none
+          script: ci/smoke-android.sh RetroRabbit-android-tv.apk smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-android-tv
+          path: smoke
