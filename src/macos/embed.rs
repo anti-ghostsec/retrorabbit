@@ -45,6 +45,7 @@ pub const VIDEO_OPTIONS: &[&str] = &[
 pub struct Parent {
     mpv: Mpv,
     render: mpv::Handle,
+    ctx: eframe::egui::Context,
 }
 
 struct ProcCtx<'a>(&'a dyn Fn(&CStr) -> *const c_void);
@@ -89,18 +90,22 @@ pub fn parent(cc: &eframe::CreationContext<'_>) -> Result<Parent, String> {
     let ctx = Box::leak(Box::new(cc.egui_ctx.clone()));
     // SAFETY: render is valid; ctx lives forever.
     unsafe { (api.render_context_set_update_callback)(render, Some(on_update), ctx as *mut _ as *mut c_void) };
-    Ok(Parent { mpv, render })
+    Ok(Parent { mpv, render, ctx: cc.egui_ctx.clone() })
 }
 
 pub struct VideoWindow {
     mpv: Mpv,
     render: mpv::Handle,
     tex: VideoTexture,
+    ctx: eframe::egui::Context,
+    /// mpv has a frame for us that we haven't drawn yet. mpv's video output
+    /// waits for it, so it must not get lost (e.g. before the texture exists).
+    pending: bool,
 }
 
 impl VideoWindow {
     pub fn new(p: Parent) -> Result<Self, String> {
-        Ok(Self { mpv: p.mpv, render: p.render, tex: VideoTexture::flipped() })
+        Ok(Self { mpv: p.mpv, render: p.render, tex: VideoTexture::flipped(), ctx: p.ctx, pending: false })
     }
 
     pub fn handle(&self) -> Mpv {
@@ -112,10 +117,17 @@ impl VideoWindow {
         let Ok(api) = mpv::api() else { return };
         // SAFETY: render context is valid; called on the GL thread.
         let flags = unsafe { (api.render_context_update)(self.render) };
+        if flags & mpv::RENDER_UPDATE_FRAME != 0 {
+            self.pending = true;
+        }
+        // egui only repaints when asked; mpv must be drawn promptly, every frame
+        // it makes, so keep the UI ticking while mpv runs.
+        self.ctx.request_repaint();
         let Some((fb, w, h, fresh)) = self.tex.target(frame) else { return };
-        if flags & mpv::RENDER_UPDATE_FRAME == 0 && !fresh {
+        if !self.pending && !fresh {
             return;
         }
+        self.pending = false;
         let mut fbo = OpenGlFbo { fbo: fb.0.get() as i32, w, h, internal_format: 0 };
         // mpv draws bottom-up for flip_y=1 (clean on every Mac we tried; 0 showed
         // block corruption), so the texture is shown flipped (VideoTexture::flipped).
