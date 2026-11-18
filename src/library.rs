@@ -2,6 +2,7 @@
 //! `ffprobe` at startup and the results are never written anywhere.
 
 use std::path::{Path, PathBuf};
+#[cfg(not(target_os = "android"))]
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};

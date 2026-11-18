@@ -22,7 +22,7 @@ pub fn init(app: &AndroidApp) {
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as *mut jni::sys::JavaVM) };
     let Ok(vm) = vm else { return };
     let activity = {
-        let Ok(mut env) = vm.attach_current_thread_permanently() else { return };
+        let Ok(env) = vm.attach_current_thread_permanently() else { return };
         // SAFETY: activity_as_ptr is a valid jobject (a global ref) for the app's lifetime.
         let obj = unsafe { JObject::from_raw(app.activity_as_ptr() as jni::sys::jobject) };
         let Ok(g) = env.new_global_ref(obj) else { return };

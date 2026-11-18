@@ -4,8 +4,14 @@
 set -euo pipefail
 dir=$1
 ff=${2:-ffmpeg}
+# H.264 where the ffmpeg build has it; LGPL builds (Windows) only have MPEG-4.
+if "$ff" -hide_banner -encoders 2>/dev/null | grep libx264 >/dev/null; then
+  codec=(-c:v libx264 -preset veryfast -pix_fmt yuv420p)
+else
+  codec=(-c:v mpeg4 -q:v 4 -pix_fmt yuv420p)
+fi
 mkdir -p "$dir/Test Pattern" "$dir/Color Bars"
 "$ff" -loglevel error -y -f lavfi -i testsrc2=size=640x360:rate=25 -t 300 -an \
-  -c:v libx264 -preset veryfast -pix_fmt yuv420p "$dir/Test Pattern/Test Pattern.mp4"
+  "${codec[@]}" "$dir/Test Pattern/Test Pattern.mp4"
 "$ff" -loglevel error -y -f lavfi -i smptebars=size=640x360:rate=25 -t 300 -an \
-  -c:v libx264 -preset veryfast -pix_fmt yuv420p "$dir/Color Bars/Color Bars.mp4"
+  "${codec[@]}" "$dir/Color Bars/Color Bars.mp4"

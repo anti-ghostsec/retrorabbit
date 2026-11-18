@@ -6,8 +6,7 @@
 
 use crate::android;
 use crate::app::RetroRabbit;
-use eframe::App as _;
-use eframe::egui::{self, Event, Key, Modifiers, OutputEvent, WidgetType};
+use eframe::egui::{self, Event, Key, Modifiers, OutputEvent, Role};
 use winit::platform::android::activity::AndroidApp;
 use winit::platform::android::activity::input::{TextInputState, TextSpan};
 
@@ -34,7 +33,7 @@ impl eframe::App for TvApp {
         let events = ctx.output(|o| o.events.clone());
         for e in events {
             if let OutputEvent::FocusGained(info) | OutputEvent::Clicked(info) = e {
-                if info.typ == WidgetType::TextEdit {
+                if info.role == Role::TextInput {
                     let text = info.current_text_value.unwrap_or_default();
                     // Passphrase boxes report dots, not the text: start those empty.
                     let text = if text.chars().all(|c| c == '•') { String::new() } else { text };
@@ -48,7 +47,7 @@ impl eframe::App for TvApp {
                 }
             }
         }
-        if !ctx.wants_keyboard_input() {
+        if !ctx.egui_wants_keyboard_input() {
             self.ime = None;
         }
 
@@ -63,7 +62,7 @@ impl eframe::App for TvApp {
     }
 
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
-        let typing = ctx.wants_keyboard_input();
+        let typing = ctx.egui_wants_keyboard_input();
         let mut keep = Vec::with_capacity(raw.events.len());
         for e in raw.events.drain(..) {
             match &e {

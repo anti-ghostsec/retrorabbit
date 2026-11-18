@@ -9,11 +9,13 @@ media=$(mktemp -d)
 export DISPLAY=:99
 Xvfb :99 -screen 0 1280x800x24 &
 sleep 2
-"$bin" --channel 2 "$media" &
+"$bin" --channel 2 "$media" >"$out/app.log" 2>&1 &
 app=$!
 shot() { sleep "$2"; import -window root "$out/$1.png"; }
 shot 1-start 20
-win=$(xdotool search --name '^RetroRabbit$' | head -1)
+kill -0 "$app" || { echo "RetroRabbit exited:"; cat "$out/app.log"; exit 1; }
+win=$(xdotool search --name '^RetroRabbit$' | head -1 || true)
+[ -n "$win" ] || { echo "no RetroRabbit window"; cat "$out/app.log"; exit 1; }
 xdotool windowactivate --sync "$win" || true
 xdotool key --window "$win" Page_Up;   shot 2-channel-up 8
 xdotool key --window "$win" Page_Down; shot 3-channel-down 8
