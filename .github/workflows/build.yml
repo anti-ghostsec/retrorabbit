@@ -3,6 +3,7 @@ name: build
 on:
   push:
     branches: [main, port]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -17,7 +18,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --locked
       - run: cargo build --release --locked
+      # Only for the smoke test: if the runners' Ubuntu mirror stalls, the build and
+      # tests above still count and the smoke test is skipped (with a warning).
       - name: Install mpv, ffmpeg and Xvfb
+        id: apt
+        continue-on-error: true
         timeout-minutes: 20
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -31,8 +36,12 @@ jobs:
             [ "$try" = 3 ] && exit 1
           done
       - name: Smoke test (Xvfb, silent test media)
+        if: steps.apt.outcome == 'success'
         timeout-minutes: 10
         run: ci/smoke-linux.sh target/release/retrorabbit smoke
+      - name: Smoke test skipped
+        if: steps.apt.outcome != 'success'
+        run: echo "::warning::Ubuntu mirror stalled; Linux smoke test skipped (build and tests passed)"
       - uses: actions/upload-artifact@v4
         with:
           name: retrorabbit-linux-x86_64
@@ -214,3 +223,43 @@ jobs:
         with:
           name: smoke-android-tv
           path: smoke
+
+  # A v* tag publishes a GitHub release with every platform's download.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows, macos, android]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect the downloads
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          chmod +x artifacts/retrorabbit-linux-x86_64/retrorabbit  # artifacts drop the exec bit
+          tar -C artifacts/retrorabbit-linux-x86_64 -czf out/retrorabbit-linux-x86_64.tar.gz retrorabbit
+          (cd artifacts/retrorabbit-windows-x86_64 && zip -qr ../../out/RetroRabbit-windows-x86_64.zip RetroRabbit)
+          cp artifacts/retrorabbit-macos-arm64/*.zip artifacts/retrorabbit-macos-x86_64/*.zip out/
+          cp artifacts/retrorabbit-android-tv/RetroRabbit-android-tv.apk out/
+          (cd out && sha256sum * > SHA256SUMS.txt)
+          ls -l out
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Your own little cable TV, now on Linux, Windows, macOS and Android TV.
+
+          - **Windows:** unzip `RetroRabbit-windows-x86_64.zip` and run `retrorabbit.exe` (mpv, ffprobe and the Vulkan loader are included).
+          - **macOS 15+:** `RetroRabbit-macos-arm64.zip` (Apple silicon) or `-x86_64.zip` (Intel). Not notarized: the first time, right-click the app and choose Open.
+          - **Android TV:** install `RetroRabbit-android-tv.apk` (for example with `adb install`). Signed with a test (debug) key.
+          - **Linux:** `retrorabbit-linux-x86_64.tar.gz`; needs `mpv`, `ffprobe` and an X11 session (or XWayland).
+
+          `SHA256SUMS.txt` has the checksums. See the README for keys and remote buttons.
+          NOTES
+          gh release create "$TAG" out/* --title "RetroRabbit $TAG" --notes-file notes.md --verify-tag

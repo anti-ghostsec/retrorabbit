@@ -57,12 +57,12 @@ RetroRabbit keeps everything in memory:
 
 ## Install
 
-RetroRabbit runs on Linux, Windows, macOS and Android TV. Builds for each come
-from GitHub Actions (see the Actions tab).
+RetroRabbit runs on Linux, Windows, macOS and Android TV. Downloads for each are
+on the [Releases](https://github.com/anti-ghostsec/retrorabbit/releases) page.
 
 ### Windows
 
-Download `retrorabbit-windows-x86_64`, unzip it and run `retrorabbit.exe`.
+Download `RetroRabbit-windows-x86_64.zip`, unzip it and run `retrorabbit.exe`.
 `mpv.exe`, `ffprobe.exe` and the Vulkan loader mpv needs are included (see
 `THIRD-PARTY.txt`). Your channel lineup, if you save one, goes in
 `%APPDATA%\retrorabbit`. If the picture stays on color bars with "mpv stopped
