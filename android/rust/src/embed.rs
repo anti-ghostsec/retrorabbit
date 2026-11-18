@@ -5,7 +5,7 @@
 
 use crate::android;
 use crate::gltex::VideoTexture;
-use eframe::egui::{self, Align2, Color32, FontId, Rect, Ui, vec2};
+use eframe::egui::{self, Color32, FontId, Rect, Ui, vec2};
 use eframe::glow::{self, HasContext};
 use jni::objects::{GlobalRef, JFloatArray, JValue};
 use std::sync::{Arc, Mutex};
@@ -219,14 +219,18 @@ impl VideoWindow {
         // Like mpv's OSD on desktop: green monospace, black border, top right.
         let p = ui.painter().with_clip_rect(screen);
         let font = FontId::monospace(30.0);
+        let max_w = (screen.width() - 80.0).max(100.0);
         let mut y = screen.min.y + 30.0;
         for line in text.lines() {
-            let pos = egui::pos2(screen.max.x - 40.0, y);
+            // Long titles wrap instead of running off the screen.
+            let green = p.layout(line.to_string(), font.clone(), crate::win95::TV_GREEN, max_w);
+            let black = p.layout(line.to_string(), font.clone(), Color32::BLACK, max_w);
+            let pos = egui::pos2(screen.max.x - 40.0 - green.size().x, y);
             for (dx, dy) in [(-2.0, 0.0), (2.0, 0.0), (0.0, -2.0), (0.0, 2.0), (-2.0, -2.0), (2.0, 2.0), (-2.0, 2.0), (2.0, -2.0)] {
-                p.text(pos + vec2(dx, dy), Align2::RIGHT_TOP, line, font.clone(), Color32::BLACK);
+                p.galley(pos + vec2(dx, dy), black.clone(), Color32::BLACK);
             }
-            p.text(pos, Align2::RIGHT_TOP, line, font.clone(), crate::win95::TV_GREEN);
-            y += 36.0;
+            y += green.size().y + 6.0;
+            p.galley(pos, green, crate::win95::TV_GREEN);
         }
     }
 }
