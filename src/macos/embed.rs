@@ -26,7 +26,9 @@ pub const VIDEO_OPTIONS: &[&str] = &[
     "demuxer-max-bytes=64MiB",
     "demuxer-max-back-bytes=16MiB",
     "network-timeout=20",
-    "hwdec=auto-safe",
+    // Hardware decoding, copied back: VideoToolbox's zero-copy hand-off to
+    // OpenGL showed black/garbled frames inside our texture.
+    "hwdec=auto-copy-safe",
     "hr-seek=no",
     "osd-level=1",
     "osd-font=Menlo",
