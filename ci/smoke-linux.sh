@@ -16,11 +16,14 @@ shot 1-start 20
 kill -0 "$app" || { echo "RetroRabbit exited:"; cat "$out/app.log"; exit 1; }
 win=$(timeout 10 xdotool search --name '^RetroRabbit$' | head -1 || true)
 [ -n "$win" ] || { echo "no RetroRabbit window"; cat "$out/app.log"; exit 1; }
-timeout 5 xdotool windowactivate "$win" || true  # no window manager under Xvfb
-timeout 10 xdotool key --window "$win" Page_Up;   shot 2-channel-up 8
-timeout 10 xdotool key --window "$win" Page_Down; shot 3-channel-down 8
-timeout 10 xdotool type --window "$win" 5;        shot 4-typed-5 8
-timeout 10 xdotool key --window "$win" g;         shot 5-guide 5
+# No window manager under Xvfb: give it the keyboard focus directly, and send
+# real (XTEST) key presses; --window would send synthetic ones apps ignore.
+timeout 5 xdotool windowfocus "$win" || true
+timeout 5 xdotool mousemove 500 400 || true
+timeout 10 xdotool key Page_Up;   shot 2-channel-up 8
+timeout 10 xdotool key Page_Down; shot 3-channel-down 8
+timeout 10 xdotool type 5;        shot 4-typed-5 8
+timeout 10 xdotool key g;         shot 5-guide 5
 kill "$app" || true
 sleep 2
 kill -9 "$app" 2>/dev/null || true

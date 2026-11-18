@@ -94,7 +94,7 @@ pub struct VideoWindow {
 
 impl VideoWindow {
     pub fn new(p: Parent) -> Result<Self, String> {
-        Ok(Self { mpv: p.mpv, render: p.render, tex: VideoTexture::new() })
+        Ok(Self { mpv: p.mpv, render: p.render, tex: VideoTexture::flipped() })
     }
 
     pub fn handle(&self) -> Mpv {
@@ -111,8 +111,9 @@ impl VideoWindow {
             return;
         }
         let mut fbo = OpenGlFbo { fbo: fb.0.get() as i32, w, h, internal_format: 0 };
-        // 0: row 0 is the picture's top, which is how egui samples textures.
-        let mut flip: i32 = 0;
+        // mpv draws bottom-up for flip_y=1 (clean on every Mac we tried; 0 showed
+        // block corruption), so the texture is shown flipped (VideoTexture::flipped).
+        let mut flip: i32 = 1;
         let mut params = [
             RenderParam { kind: mpv::RENDER_PARAM_OPENGL_FBO, data: &mut fbo as *mut _ as *mut c_void },
             RenderParam { kind: mpv::RENDER_PARAM_FLIP_Y, data: &mut flip as *mut _ as *mut c_void },

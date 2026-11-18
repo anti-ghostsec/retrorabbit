@@ -9,11 +9,17 @@ pub struct VideoTexture {
     /// Size of the texture now, and the size egui last asked for (pixels).
     size: (i32, i32),
     want: (i32, i32),
+    /// The decoder draws bottom-up (OpenGL's way): show it flipped.
+    flip: bool,
 }
 
 impl VideoTexture {
     pub fn new() -> Self {
-        Self { tex: None, size: (0, 0), want: (0, 0) }
+        Self { tex: None, size: (0, 0), want: (0, 0), flip: false }
+    }
+
+    pub fn flipped() -> Self {
+        Self { flip: true, ..Self::new() }
     }
 
     /// Make sure the texture matches the screen size. Returns the framebuffer to
@@ -74,7 +80,8 @@ impl VideoTexture {
         let ppp = ui.ctx().pixels_per_point();
         self.want = ((screen.width() * ppp).round() as i32, (screen.height() * ppp).round() as i32);
         if let (true, Some((_, _, id))) = (visible, &self.tex) {
-            let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+            let (top, bottom) = if self.flip { (1.0, 0.0) } else { (0.0, 1.0) };
+            let uv = Rect::from_min_max(pos2(0.0, top), pos2(1.0, bottom));
             ui.painter().image(*id, screen, uv, egui::Color32::WHITE);
         }
     }
