@@ -150,7 +150,9 @@ class TvPlayer(ctx: Context, texture: Int) : Player.Listener, SurfaceTexture.OnF
             ).build()
             dyn = DynamicsProcessing(0, session, cfg).apply {
                 setMbcBandAllChannelsTo(0, DynamicsProcessing.MbcBand(
-                    true, true, 20000f, 20f, 800f, 3f, -32f, 8f, -90f, 1f, 0f, 9f,
+                    // enabled, cutoff Hz, attack ms, release ms, ratio, threshold dB,
+                    // knee dB, noise gate dB, expander ratio, pre-gain dB, post-gain dB
+                    true, 20000f, 20f, 800f, 3f, -32f, 8f, -90f, 1f, 0f, 9f,
                 ))
                 setLimiterAllChannelsTo(DynamicsProcessing.Limiter(true, true, 0, 1f, 80f, 10f, -3f, 0f))
                 enabled = true

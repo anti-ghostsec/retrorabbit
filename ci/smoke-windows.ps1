@@ -15,10 +15,14 @@ function Shot($name, $wait) {
   $bmp.Save((Join-Path $Out "$name.png"))
   $g.Dispose(); $bmp.Dispose()
 }
-$p = Start-Process -FilePath (Join-Path $Dir "retrorabbit.exe") -ArgumentList "--channel", "2", "`"$Media`"" -PassThru
+$p = Start-Process -FilePath (Join-Path $Dir "retrorabbit.exe") -ArgumentList "--channel", "2", "`"$Media`"" -PassThru `
+  -RedirectStandardError (Join-Path $Out "app-stderr.txt") -RedirectStandardOutput (Join-Path $Out "app-stdout.txt")
 $ws = New-Object -ComObject WScript.Shell
 Shot "1-start" 20
-if ($p.HasExited) { Write-Error "RetroRabbit exited with code $($p.ExitCode)" }
+if ($p.HasExited) {
+  Get-Content (Join-Path $Out "app-stderr.txt") -ErrorAction SilentlyContinue
+  Write-Error "RetroRabbit exited with code $($p.ExitCode)"
+}
 $null = $ws.AppActivate($p.Id)
 $ws.SendKeys("{PGUP}"); Shot "2-channel-up" 8
 $ws.SendKeys("{PGDN}"); Shot "3-channel-down" 8

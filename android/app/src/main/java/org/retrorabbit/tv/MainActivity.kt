@@ -7,7 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
-import com.google.androidx.gamesdk.GameActivity
+import com.google.androidgamesdk.GameActivity
 import org.json.JSONObject
 
 /**
