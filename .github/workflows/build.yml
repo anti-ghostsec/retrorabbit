@@ -18,6 +18,7 @@ jobs:
       - run: cargo test --locked
       - run: cargo build --release --locked
       - name: Smoke test (Xvfb, silent test media)
+        timeout-minutes: 10
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq mpv ffmpeg xvfb xdotool imagemagick libgl1-mesa-dri libegl1 libxkbcommon-x11-0 >/dev/null
@@ -66,9 +67,19 @@ jobs:
           RetroRabbit only runs these as separate programs.
           TXT
           ci/make-test-media.sh "$PWD/testmedia" "$(ls ffmpeg/*/bin/ffmpeg.exe)"
+          # The runner has no GPU, only OpenGL 1.1: test with Mesa's software OpenGL
+          # in a separate copy (the download itself doesn't ship it).
+          mesa_url=$(gh api repos/pal1000/mesa-dist-win/releases/latest \
+            --jq '.assets[] | select(.name | test("release-msvc\\.7z$")) | .browser_download_url' | head -1)
+          echo "mesa: $mesa_url"
+          curl -fsSL -o mesa.7z "$mesa_url"
+          7z x -y -omesa mesa.7z >/dev/null
+          cp -r dist/RetroRabbit smoketest
+          cp mesa/x64/*.dll smoketest/
       - name: Smoke test
+        timeout-minutes: 10
         shell: pwsh
-        run: ci/smoke-windows.ps1 -Dir dist/RetroRabbit -Media "$PWD/testmedia" -Out smoke
+        run: ci/smoke-windows.ps1 -Dir smoketest -Media "$PWD/testmedia" -Out smoke
       - uses: actions/upload-artifact@v4
         with:
           name: retrorabbit-windows-x86_64
@@ -100,6 +111,7 @@ jobs:
           ci/bundle-macos.sh target/release/retrorabbit dist/RetroRabbit.app "$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
           ditto -c -k --keepParent dist/RetroRabbit.app dist/RetroRabbit-macos-${{ matrix.arch }}.zip
       - name: Smoke test
+        timeout-minutes: 10
         run: ci/smoke-macos.sh dist/RetroRabbit.app smoke
       - uses: actions/upload-artifact@v4
         with:
@@ -155,6 +167,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
       - name: Smoke test on an Android TV emulator (no audio)
+        timeout-minutes: 30
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34

@@ -20,7 +20,7 @@ shot 1-start 30
 key KEYCODE_CHANNEL_UP;   shot 2-channel-up 10
 key KEYCODE_DPAD_UP;      shot 3-dpad-up 10
 key KEYCODE_CHANNEL_DOWN; shot 4-channel-down 10
-key KEYCODE_2;            shot 5-typed-2 10
+key KEYCODE_5;            shot 5-typed-5 10
 key KEYCODE_BACK;         shot 6-back-recall 10
 key KEYCODE_DPAD_CENTER;  shot 7-ok-toolbar 5
 key KEYCODE_BACK

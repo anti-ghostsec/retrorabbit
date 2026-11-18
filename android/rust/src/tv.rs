@@ -6,7 +6,8 @@
 
 use crate::android;
 use crate::app::RetroRabbit;
-use eframe::egui::{self, Event, Key, Modifiers, OutputEvent, Role};
+use eframe::egui::output::OutputEvent;
+use eframe::egui::{self, Event, Key, Modifiers, Role};
 use winit::platform::android::activity::AndroidApp;
 use winit::platform::android::activity::input::{TextInputState, TextSpan};
 

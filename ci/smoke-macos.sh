@@ -14,6 +14,6 @@ shot 1-start 25
 osascript -e "tell application \"System Events\" to set frontmost of (first process whose unix id is $pid) to true" || true
 key "key code 116"; shot 2-channel-up 8      # Page Up
 key "key code 121"; shot 3-channel-down 8    # Page Down
-key 'keystroke "3"'; shot 4-typed-3 8
+key 'keystroke "5"'; shot 4-typed-5 8
 key 'keystroke "g"'; shot 5-guide 5
 kill "$pid" || true

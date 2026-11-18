@@ -16,10 +16,12 @@ shot 1-start 20
 kill -0 "$app" || { echo "RetroRabbit exited:"; cat "$out/app.log"; exit 1; }
 win=$(xdotool search --name '^RetroRabbit$' | head -1 || true)
 [ -n "$win" ] || { echo "no RetroRabbit window"; cat "$out/app.log"; exit 1; }
-xdotool windowactivate --sync "$win" || true
+timeout 5 xdotool windowactivate "$win" || true  # no window manager under Xvfb
 xdotool key --window "$win" Page_Up;   shot 2-channel-up 8
 xdotool key --window "$win" Page_Down; shot 3-channel-down 8
-xdotool type --window "$win" 3;        shot 4-typed-3 8
+xdotool type --window "$win" 5;        shot 4-typed-5 8
 xdotool key --window "$win" g;         shot 5-guide 5
-kill "$app"
-wait "$app" || true
+kill "$app" || true
+sleep 2
+kill -9 "$app" 2>/dev/null || true
+pkill -x mpv || true
