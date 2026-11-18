@@ -15,6 +15,8 @@ function Shot($name, $wait) {
   $bmp.Save((Join-Path $Out "$name.png"))
   $g.Dispose(); $bmp.Dispose()
 }
+# mpv works on its own? (Also gets the virus scan of a new mpv.exe out of the way.)
+& (Join-Path $Dir "mpv.exe") --version | Select-Object -First 1
 $p = Start-Process -FilePath (Join-Path $Dir "retrorabbit.exe") -ArgumentList "--channel", "2", "`"$Media`"" -PassThru `
   -RedirectStandardError (Join-Path $Out "app-stderr.txt") -RedirectStandardOutput (Join-Path $Out "app-stdout.txt")
 $ws = New-Object -ComObject WScript.Shell

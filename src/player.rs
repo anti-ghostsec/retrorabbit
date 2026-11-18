@@ -208,7 +208,8 @@ impl Player {
             .spawn()
             .map_err(|e| format!("couldn't start mpv: {e}"))?;
 
-        let deadline = Instant::now() + Duration::from_secs(5);
+        // Windows: the first start of a new mpv.exe can wait on the virus scanner.
+        let deadline = Instant::now() + Duration::from_secs(if cfg!(windows) { 20 } else { 5 });
         let (sock, reader) = loop {
             match connect(&path) {
                 Ok(s) => break s,
