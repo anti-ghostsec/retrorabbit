@@ -18,12 +18,13 @@ jobs:
       - run: cargo test --locked
       - run: cargo build --release --locked
       - name: Install mpv, ffmpeg and Xvfb
-        timeout-minutes: 10
+        timeout-minutes: 20
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo apt-get update -qq
-          sudo -E apt-get install -y -q --no-install-recommends mpv ffmpeg xvfb xauth xdotool imagemagick libgl1-mesa-dri libegl1 libxkbcommon-x11-0 </dev/null
+          sudo -E apt-get install -y -q --no-install-recommends -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
+            mpv ffmpeg xvfb xauth xdotool libgl1-mesa-dri libegl1 libxkbcommon-x11-0 </dev/null
       - name: Smoke test (Xvfb, silent test media)
         timeout-minutes: 10
         run: ci/smoke-linux.sh target/release/retrorabbit smoke
@@ -79,7 +80,9 @@ jobs:
           curl -fsSL -o mesa.7z "$mesa_url"
           7z x -y -omesa mesa.7z >/dev/null
           cp -r dist/RetroRabbit smoketest
+          ls mesa mesa/x64
           cp mesa/x64/*.dll smoketest/
+          ls smoketest
       - name: Smoke test
         timeout-minutes: 10
         shell: pwsh

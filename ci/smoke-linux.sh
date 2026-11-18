@@ -11,7 +11,7 @@ Xvfb :99 -screen 0 1280x800x24 >/dev/null 2>&1 &
 sleep 2
 "$bin" --channel 2 "$media" >"$out/app.log" 2>&1 &
 app=$!
-shot() { sleep "$2"; timeout 20 import -window root "$out/$1.png" || echo "screenshot $1 failed"; }
+shot() { sleep "$2"; timeout 20 ffmpeg -nostdin -loglevel error -y -f x11grab -video_size 1280x800 -i :99 -frames:v 1 "$out/$1.png" || echo "screenshot $1 failed"; }
 shot 1-start 20
 kill -0 "$app" || { echo "RetroRabbit exited:"; cat "$out/app.log"; exit 1; }
 win=$(timeout 10 xdotool search --name '^RetroRabbit$' | head -1 || true)

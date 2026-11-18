@@ -18,6 +18,14 @@ function Shot($name, $wait) {
 $p = Start-Process -FilePath (Join-Path $Dir "retrorabbit.exe") -ArgumentList "--channel", "2", "`"$Media`"" -PassThru `
   -RedirectStandardError (Join-Path $Out "app-stderr.txt") -RedirectStandardOutput (Join-Path $Out "app-stdout.txt")
 $ws = New-Object -ComObject WScript.Shell
+# Which OpenGL is it loading? (Mesa's opengl32.dll next to the exe, we hope.)
+for ($i = 0; $i -lt 30 -and -not $p.HasExited; $i++) {
+  Start-Sleep -Milliseconds 100
+  try {
+    $gl = (Get-Process -Id $p.Id).Modules | Where-Object { $_.ModuleName -match "opengl|gallium|glapi|EGL" }
+    if ($gl) { $gl | ForEach-Object { "loaded: $($_.FileName)" }; break }
+  } catch {}
+}
 Shot "1-start" 20
 if ($p.HasExited) {
   Get-Content (Join-Path $Out "app-stderr.txt") -ErrorAction SilentlyContinue
