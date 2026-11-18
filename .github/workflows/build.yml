@@ -81,6 +81,7 @@ jobs:
           curl -fsSL -o mesa.7z "$mesa_url"
           7z x -y -omesa mesa.7z >/dev/null
           cp -r dist/RetroRabbit smoketest
+          cp mpv/mpv.com smoketest/ || true
           gl=$(find mesa -iname opengl32.dll | grep -i x64 | head -1 || true)
           if [ -z "$gl" ]; then find mesa -iname '*.dll'; echo "no x64 opengl32.dll in Mesa"; exit 1; fi
           echo "Mesa OpenGL: $gl"
