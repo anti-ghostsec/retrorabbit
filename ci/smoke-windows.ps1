@@ -44,6 +44,14 @@ if (Test-Path $mpvcom) {
   Start-Sleep -Seconds 8
   "mpv test: running=$(-not $m.HasExited) exit=$($m.ExitCode) pipe=$(Test-Path $pipe)"
   if (-not $m.HasExited) { Stop-Process -Id $m.Id }
+  # And can it play a video in a window, like it does inside RetroRabbit?
+  $video = Get-ChildItem -Path $Media -Recurse -Filter *.mp4 | Select-Object -First 1
+  $play = $opts[1..($opts.Count - 1)] | Where-Object { $_ -ne "--force-window=no" -and $_ -ne "--idle=yes" }
+  $play += @("--force-window=yes", "--length=6", "--log-file=$(Join-Path $Out 'mpv-play-log.txt')", $video.FullName)
+  $v = Start-Process -FilePath $mpvcom -ArgumentList $play -PassThru -NoNewWindow -Wait `
+    -RedirectStandardOutput (Join-Path $Out "mpv-play.txt") -RedirectStandardError (Join-Path $Out "mpv-play-err.txt")
+  "mpv play test: exit=$($v.ExitCode)"
+  Get-Content (Join-Path $Out "mpv-play-log.txt") -ErrorAction SilentlyContinue | Select-String -Pattern "error|fail|vo/|Using|crash" | Select-Object -Last 25
   Get-Content (Join-Path $Out "mpv-test.txt"), (Join-Path $Out "mpv-test-err.txt") -ErrorAction SilentlyContinue | Select-Object -Last 30
 }
 $p = Start-Process -FilePath (Join-Path $Dir "retrorabbit.exe") -ArgumentList "--channel", "2", "`"$Media`"" -PassThru `

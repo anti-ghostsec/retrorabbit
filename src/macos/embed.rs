@@ -125,10 +125,24 @@ impl VideoWindow {
         unsafe {
             // egui leaves its last clip rectangle as the scissor: mpv would only
             // draw inside it (the rest of the texture keeps stale garbage).
+            // Also hand mpv default upload/binding state, as libmpv expects.
             if let Some(gl) = frame.gl() {
                 gl.disable(glow::SCISSOR_TEST);
                 gl.disable(glow::BLEND);
+                gl.disable(glow::CULL_FACE);
+                gl.disable(glow::DEPTH_TEST);
                 gl.color_mask(true, true, true, true);
+                gl.bind_vertex_array(None);
+                gl.use_program(None);
+                gl.bind_buffer(glow::ARRAY_BUFFER, None);
+                gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, None);
+                gl.bind_buffer(glow::PIXEL_UNPACK_BUFFER, None);
+                gl.active_texture(glow::TEXTURE0);
+                gl.bind_texture(glow::TEXTURE_2D, None);
+                gl.pixel_store_i32(glow::UNPACK_ALIGNMENT, 4);
+                gl.pixel_store_i32(glow::UNPACK_ROW_LENGTH, 0);
+                gl.pixel_store_i32(glow::UNPACK_SKIP_ROWS, 0);
+                gl.pixel_store_i32(glow::UNPACK_SKIP_PIXELS, 0);
             }
             (api.render_context_render)(self.render, params.as_mut_ptr());
             if let Some(gl) = frame.gl() {
