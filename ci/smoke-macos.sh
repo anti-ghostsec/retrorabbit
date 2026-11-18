@@ -6,7 +6,7 @@ out=$2
 mkdir -p "$out"
 media=$(mktemp -d)
 "$(dirname "$0")/make-test-media.sh" "$media"
-"$app/Contents/MacOS/retrorabbit" --channel 2 "$media" &
+RETRORABBIT_DEBUG=1 "$app/Contents/MacOS/retrorabbit" --channel 2 "$media" >"$out/app.log" 2>&1 &
 pid=$!
 shot() { sleep "$2"; screencapture -x "$out/$1.png" || true; }
 key() { osascript -e "tell application \"System Events\" to $1" || echo "couldn't send key: $1"; }
@@ -17,3 +17,4 @@ key "key code 121"; shot 3-channel-down 8    # Page Down
 key 'keystroke "5"'; shot 4-typed-5 8
 key 'keystroke "g"'; shot 5-guide 5
 kill "$pid" || true
+grep -iE "error|fail|\[vo|hwdec|\[vd\]|Using|render" "$out/app.log" | tail -60 || true

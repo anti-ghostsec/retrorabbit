@@ -65,7 +65,11 @@ unsafe extern "C" fn on_update(ctx: *mut c_void) {
 /// Start the video mpv and hook its renderer to our OpenGL context.
 pub fn parent(cc: &eframe::CreationContext<'_>) -> Result<Parent, String> {
     let get = cc.get_proc_address.clone().ok_or("No OpenGL context.")?;
-    let opts: Vec<String> = VIDEO_OPTIONS.iter().map(|s| s.to_string()).collect();
+    let mut opts: Vec<String> = VIDEO_OPTIONS.iter().map(|s| s.to_string()).collect();
+    // RETRORABBIT_DEBUG=1: mpv logs to stderr (never to a file).
+    if std::env::var_os("RETRORABBIT_DEBUG").is_some() {
+        opts.extend(["terminal=yes".to_string(), "msg-level=all=v".to_string()]);
+    }
     let mpv = Mpv::new(&opts)?;
     let api = mpv::api()?;
     let mut pc = ProcCtx(&*get);

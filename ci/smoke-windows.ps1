@@ -47,7 +47,7 @@ if (Test-Path $mpvcom) {
   # And can it play a video in a window, like it does inside RetroRabbit?
   $video = Get-ChildItem -Path $Media -Recurse -Filter *.mp4 | Select-Object -First 1
   $play = $opts[1..($opts.Count - 1)] | Where-Object { $_ -ne "--force-window=no" -and $_ -ne "--idle=yes" }
-  $play += @("--force-window=yes", "--length=6", "--log-file=$(Join-Path $Out 'mpv-play-log.txt')", $video.FullName)
+  $play += @("--force-window=yes", "--length=6", "--log-file=$(Join-Path $Out 'mpv-play-log.txt')", "`"$($video.FullName)`"")
   $v = Start-Process -FilePath $mpvcom -ArgumentList $play -PassThru -NoNewWindow -Wait `
     -RedirectStandardOutput (Join-Path $Out "mpv-play.txt") -RedirectStandardError (Join-Path $Out "mpv-play-err.txt")
   "mpv play test: exit=$($v.ExitCode)"
