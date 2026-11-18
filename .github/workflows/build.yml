@@ -73,9 +73,10 @@ jobs:
           TXT
           ci/make-test-media.sh "$PWD/testmedia" "$(ls ffmpeg/*/bin/ffmpeg.exe)"
           # The runner has no GPU, only OpenGL 1.1: test with Mesa's software OpenGL
-          # in a separate copy (the download itself doesn't ship it).
+          # in a separate copy (the download itself doesn't ship it). The MinGW build:
+          # Mesa's MSVC build currently comes without OpenGL.
           mesa_url=$(gh api repos/pal1000/mesa-dist-win/releases/latest \
-            --jq '.assets[] | select(.name | test("release-msvc\\.7z$")) | .browser_download_url' | head -1)
+            --jq '.assets[] | select(.name | test("release-mingw\\.7z$")) | .browser_download_url' | head -1)
           echo "mesa: $mesa_url"
           curl -fsSL -o mesa.7z "$mesa_url"
           7z x -y -omesa mesa.7z >/dev/null
