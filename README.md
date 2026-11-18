@@ -63,8 +63,11 @@ from GitHub Actions (see the Actions tab).
 ### Windows
 
 Download `retrorabbit-windows-x86_64`, unzip it and run `retrorabbit.exe`.
-`mpv.exe` and `ffprobe.exe` are included (see `THIRD-PARTY.txt`). Your channel
-lineup, if you save one, goes in `%APPDATA%\retrorabbit`.
+`mpv.exe`, `ffprobe.exe` and the Vulkan loader mpv needs are included (see
+`THIRD-PARTY.txt`). Your channel lineup, if you save one, goes in
+`%APPDATA%\retrorabbit`. If the picture stays on color bars with "mpv stopped
+unexpectedly", your graphics driver may not get along with mpv's default
+renderer: set `RETRORABBIT_MPV_ARGS=--vo=gpu` (any extra mpv options work).
 
 ### macOS
 

@@ -18,6 +18,7 @@ impl VideoTexture {
         Self { tex: None, size: (0, 0), want: (0, 0), flip: false }
     }
 
+    #[cfg_attr(target_os = "android", allow(dead_code))]
     pub fn flipped() -> Self {
         Self { flip: true, ..Self::new() }
     }
