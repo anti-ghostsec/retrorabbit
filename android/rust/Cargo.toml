@@ -1,0 +1,38 @@
+[package]
+name = "retrorabbit-android"
+version = "0.1.0"
+edition = "2024"
+description = "RetroRabbit for Android TV: the desktop app's code with an ExoPlayer video backend."
+license = "MIT"
+publish = false
+
+# The app's modules are shared with the desktop build by #[path] (see src/lib.rs),
+# so the desktop crate stays a plain binary.
+[lib]
+name = "retrorabbit"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts", "android-game-activity"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "2.12", features = ["json"] }
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+zeroize = "1"
+dirs = "6"
+libc = "0.2"
+winit = { version = "0.30", default-features = false, features = ["android-game-activity"] }
+jni = "0.21"
+ndk = { version = "0.9", features = ["audio"] }
+log = "0.4"
+android_logger = "0.15"
+
+[profile.release]
+lto = "thin"
+strip = true
+opt-level = 3
+
+[profile.dev.package."*"]
+opt-level = 2

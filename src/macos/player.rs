@@ -24,6 +24,8 @@ pub struct Player {
 fn events(mpv: Mpv, st: Arc<Mutex<PlayerState>>) {
     let Ok(api) = mpv::api() else { return };
     std::thread::spawn(move || {
+        // Capture the whole (Send) wrapper, not just its raw pointer field.
+        let mpv = mpv;
         loop {
             // SAFETY: the core is never destroyed; one thread waits on it.
             let ev = unsafe { &*(api.wait_event)(mpv.0, -1.0) };

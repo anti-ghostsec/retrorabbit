@@ -75,6 +75,8 @@ pub struct RetroRabbit {
     ed_pass: Zeroizing<String>,
     ed_status: String,
     saved_to_disk: bool,
+    /// Put keyboard focus on the toolbar next frame (TV remote: OK shows the toolbar).
+    focus_toolbar: bool,
 }
 
 impl RetroRabbit {
@@ -131,7 +133,8 @@ impl RetroRabbit {
             digits: String::new(),
             wheel: 0.0,
             digits_deadline: 0.0,
-            fullscreen: false,
+            // A TV starts on the picture alone; OK on the remote brings up the toolbar.
+            fullscreen: cfg!(target_os = "android"),
             muted: false,
             noise: None,
             rng: SplitMix(unix_now().to_bits()),
@@ -145,6 +148,7 @@ impl RetroRabbit {
             ed_pass: Zeroizing::new(String::new()),
             ed_status: String::new(),
             saved_to_disk: false,
+            focus_toolbar: false,
         };
         app.lineup.channels = schedule::auto_lineup(&[], &app.lineup.media_roots);
         app.rescan();
@@ -154,6 +158,45 @@ impl RetroRabbit {
     fn rescan(&mut self) {
         let r = self.repaint.clone();
         self.lib.scan(self.lineup.media_roots.clone(), move || r());
+    }
+
+    /// TV remote Back: close what's open, else hide the toolbar, else recall.
+    #[cfg(target_os = "android")]
+    pub fn tv_back(&mut self) {
+        if self.show_editor {
+            self.show_editor = false;
+        } else if self.show_guide {
+            self.show_guide = false;
+        } else if !self.fullscreen {
+            self.fullscreen = true;
+        } else {
+            self.tune(self.previous);
+        }
+    }
+
+    /// TV remote OK while watching: bring up the toolbar. False if OK is for a widget.
+    #[cfg(target_os = "android")]
+    pub fn tv_ok(&mut self) -> bool {
+        if self.fullscreen && !self.show_guide && !self.show_editor {
+            self.fullscreen = false;
+            self.focus_toolbar = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Storage permission was just granted: look for the TV's videos again.
+    #[cfg(target_os = "android")]
+    pub fn tv_rescan(&mut self) {
+        if let Some(d) = Some(crate::Args::parse().folders).filter(|f| !f.is_empty()) {
+            for f in d {
+                if !self.lineup.media_roots.contains(&f) {
+                    self.lineup.media_roots.push(f);
+                }
+            }
+        }
+        self.rescan();
     }
 
     // ---- data ------------------------------------------------------------
@@ -493,9 +536,11 @@ impl RetroRabbit {
                 .filter_map(|e| if let egui::Event::Text(t) = e { Some(t.clone()) } else { None })
                 .collect();
             let pressed = |k| i.key_pressed(k);
+            // On a TV the arrows move between buttons while a menu or window is up.
+            let arrows = cfg!(not(target_os = "android")) || (self.fullscreen && !self.show_guide && !self.show_editor);
             let keys = [
-                pressed(Key::ArrowUp) || pressed(Key::PageUp),
-                pressed(Key::ArrowDown) || pressed(Key::PageDown),
+                (arrows && pressed(Key::ArrowUp)) || pressed(Key::PageUp),
+                (arrows && pressed(Key::ArrowDown)) || pressed(Key::PageDown),
                 pressed(Key::Backspace),
                 pressed(Key::G),
                 pressed(Key::C),
@@ -576,7 +621,11 @@ impl RetroRabbit {
         ui.horizontal_wrapped(|ui| {
             ui.label(egui::RichText::new("RetroRabbit").strong().color(NAVY).size(16.0));
             ui.separator();
-            if win95::button_ex(ui, "Ch +", false, 54.0).clicked() {
+            let ch_up = win95::button_ex(ui, "Ch +", false, 54.0);
+            if std::mem::take(&mut self.focus_toolbar) {
+                ch_up.request_focus();
+            }
+            if ch_up.clicked() {
                 self.step(1);
             }
             if win95::button_ex(ui, "Ch -", false, 54.0).clicked() {
