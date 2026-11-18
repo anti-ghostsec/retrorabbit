@@ -77,6 +77,8 @@ pub struct RetroRabbit {
     saved_to_disk: bool,
     /// Put keyboard focus on the toolbar next frame (TV remote: OK shows the toolbar).
     focus_toolbar: bool,
+    /// The guide was opened this frame.
+    guide_opening: bool,
 }
 
 impl RetroRabbit {
@@ -149,6 +151,7 @@ impl RetroRabbit {
             ed_status: String::new(),
             saved_to_disk: false,
             focus_toolbar: false,
+            guide_opening: false,
         };
         app.lineup.channels = schedule::auto_lineup(&[], &app.lineup.media_roots);
         app.rescan();
@@ -581,6 +584,7 @@ impl RetroRabbit {
         }
         if guide {
             self.show_guide = !self.show_guide;
+            self.guide_opening = self.show_guide;
         }
         if chans {
             self.show_editor = !self.show_editor;
@@ -864,7 +868,12 @@ impl RetroRabbit {
             .with_title("TV Guide – RetroRabbit")
             .with_inner_size([900.0, 560.0]);
         ctx.show_viewport_immediate(ViewportId::from_hash_of("rr-guide"), builder, |ui, _| {
-            if ui.ctx().input(|i| i.viewport().close_requested() || i.key_pressed(Key::Escape) || i.key_pressed(Key::G)) {
+            // Where the guide is drawn inside the main window (a TV), the G that
+            // opened it is still pressed this frame: don't let it close it again.
+            let opening = std::mem::take(&mut self.guide_opening);
+            if ui.ctx().input(|i| {
+                i.viewport().close_requested() || i.key_pressed(Key::Escape) || (!opening && i.key_pressed(Key::G))
+            }) {
                 self.show_guide = false;
             }
             egui::CentralPanel::default()

@@ -121,6 +121,13 @@ impl VideoWindow {
         ];
         // SAFETY: params outlive the call; eframe's GL context is current.
         unsafe {
+            // egui leaves its last clip rectangle as the scissor: mpv would only
+            // draw inside it (the rest of the texture keeps stale garbage).
+            if let Some(gl) = frame.gl() {
+                gl.disable(glow::SCISSOR_TEST);
+                gl.disable(glow::BLEND);
+                gl.color_mask(true, true, true, true);
+            }
             (api.render_context_render)(self.render, params.as_mut_ptr());
             if let Some(gl) = frame.gl() {
                 gl.bind_framebuffer(glow::FRAMEBUFFER, None);
