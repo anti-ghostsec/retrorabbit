@@ -80,9 +80,10 @@ jobs:
           curl -fsSL -o mesa.7z "$mesa_url"
           7z x -y -omesa mesa.7z >/dev/null
           cp -r dist/RetroRabbit smoketest
-          ls mesa mesa/x64
-          cp mesa/x64/*.dll smoketest/
-          ls smoketest
+          gl=$(find mesa -iname opengl32.dll | grep -i x64 | head -1 || true)
+          if [ -z "$gl" ]; then find mesa -iname '*.dll'; echo "no x64 opengl32.dll in Mesa"; exit 1; fi
+          echo "Mesa OpenGL: $gl"
+          cp "$(dirname "$gl")"/*.dll mesa/x64/*.dll smoketest/
       - name: Smoke test
         timeout-minutes: 10
         shell: pwsh
