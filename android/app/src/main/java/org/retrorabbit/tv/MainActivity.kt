@@ -70,7 +70,8 @@ class MainActivity : GameActivity() {
     }
 
     /**
-     * Remote buttons → the desktop's keys: Channel +/- → Page Up/Down, Guide/Menu → G,
+     * Remote buttons → the desktop's keys: Channel +/- → Page Up/Down, Menu → G (Guide
+     * too, though most TVs keep that button for their own guide),
      * Info → I, Last channel → Backspace, Red/Green/Yellow/Blue → Like/Fav/Only-favs/Channels,
      * Back → Esc (the app decides: close a window, hide the toolbar, or recall), OK → Enter.
      */

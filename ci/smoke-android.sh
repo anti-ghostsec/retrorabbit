@@ -24,7 +24,7 @@ key KEYCODE_5;            shot 5-typed-5 10
 key KEYCODE_BACK;         shot 6-back-recall 10
 key KEYCODE_DPAD_CENTER;  shot 7-ok-toolbar 5
 key KEYCODE_BACK
-key KEYCODE_GUIDE;        shot 8-guide 5
+key KEYCODE_MENU;         shot 8-guide 5
 key KEYCODE_BACK
 key KEYCODE_PROG_BLUE;    shot 9-channel-editor 5
 adb logcat -d > "$out/logcat.txt"

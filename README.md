@@ -85,7 +85,7 @@ and it makes channels from the TV's `Movies` and `Download` folders too.
 | 0–9 | Type a channel number |
 | Back | Last channel (or close the guide / channel editor / toolbar) |
 | OK | Show the toolbar (then arrows and OK work its buttons) |
-| Guide or Menu | TV guide |
+| Menu (or Guide, on TVs that pass it to apps) | TV guide |
 | Info | What's on |
 | Red / Green / Yellow / Blue | Like / favorite channel / favorites only / channel editor |
 
