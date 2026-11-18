@@ -181,6 +181,7 @@ jobs:
           api-level: 34
           target: android-tv
           arch: x86
+          profile: tv_1080p
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim -camera-back none
           script: ci/smoke-android.sh RetroRabbit-android-tv.apk smoke
