@@ -50,6 +50,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --locked
       - run: cargo build --release --locked
+      - name: Build the Vulkan loader
+        # mpv.exe links vulkan-1.dll. GPU drivers install it, but PCs and VMs without
+        # one don't have it, so the download ships Khronos's loader, built from source.
+        shell: bash
+        run: |
+          git clone -q --depth 1 -b vulkan-sdk-1.4.363.0 https://github.com/KhronosGroup/Vulkan-Loader vkloader
+          cmake -S vkloader -B vkloader/build -A x64 -DUPDATE_DEPS=ON -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release >/dev/null
+          cmake --build vkloader/build --config Release --parallel >/dev/null
+          find vkloader/build -name vulkan-1.dll
       - name: Package with mpv and ffprobe
         shell: bash
         env:
@@ -72,11 +81,15 @@ jobs:
           cp mpv/*.dll "$d/" 2>/dev/null || true
           cp ffmpeg/*/bin/ffprobe.exe "$d/"
           cp ffmpeg/*/LICENSE.txt "$d/ffprobe-LICENSE.txt" || true
+          cp "$(find vkloader/build -name vulkan-1.dll | head -1)" "$d/"
+          cp vkloader/LICENSE.txt "$d/vulkan-loader-LICENSE.txt"
           cat > "$d/THIRD-PARTY.txt" <<TXT
           mpv.exe: mpv (GPL-2.0-or-later), build from https://github.com/shinchiro/mpv-winbuild-cmake
             ($mpv_url). Source: https://github.com/mpv-player/mpv
           ffprobe.exe: FFmpeg (LGPL-2.1-or-later), build from https://github.com/BtbN/FFmpeg-Builds
             (ffmpeg-master-latest-win64-lgpl). Source: https://ffmpeg.org
+          vulkan-1.dll: Khronos Vulkan Loader (Apache-2.0), built from
+            https://github.com/KhronosGroup/Vulkan-Loader (vulkan-sdk-1.4.363.0).
           RetroRabbit only runs these as separate programs.
           TXT
           ci/make-test-media.sh "$PWD/testmedia" "$(ls ffmpeg/*/bin/ffmpeg.exe)"
