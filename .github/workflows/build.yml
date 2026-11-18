@@ -93,7 +93,7 @@ jobs:
           gl=$(find mesa -iname opengl32.dll | grep -i x64 | head -1 || true)
           if [ -z "$gl" ]; then find mesa -iname '*.dll'; echo "no x64 opengl32.dll in Mesa"; exit 1; fi
           echo "Mesa OpenGL: $gl"
-          cp "$(dirname "$gl")"/*.dll mesa/x64/*.dll smoketest/
+          cp "$(dirname "$gl")"/*.dll smoketest/
       - name: Smoke test
         timeout-minutes: 10
         shell: pwsh

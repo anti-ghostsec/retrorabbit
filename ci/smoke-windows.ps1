@@ -19,6 +19,16 @@ function Shot($name, $wait) {
 }
 # Does mpv run with RetroRabbit's options? (Also gets the virus scan of a new
 # mpv.exe out of the way.) mpv.com is the console twin of mpv.exe.
+# Which DLLs does mpv.exe import, and which can't Windows find?
+$dumpbin = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio" -Recurse -Filter dumpbin.exe -ErrorAction SilentlyContinue |
+  Where-Object { $_.FullName -match "Hostx64\\x64" } | Select-Object -First 1
+if ($dumpbin) {
+  $deps = & $dumpbin.FullName /nologo /dependents (Join-Path $Dir "mpv.exe") | Where-Object { $_ -match "^\s+\S+\.dll\s*$" } | ForEach-Object { $_.Trim() }
+  foreach ($d in $deps) {
+    $where = @((Join-Path $Dir $d), (Join-Path $env:WINDIR "System32\$d")) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    "mpv needs $d -> $(if ($where) { $where } else { 'MISSING' })"
+  }
+}
 $mpvcom = Join-Path $Dir "mpv.com"
 if (Test-Path $mpvcom) {
   $pipe = "\\.\pipe\rr-smoke-test"
