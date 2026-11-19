@@ -216,7 +216,9 @@ jobs:
           set -eu
           rm -f android/keystore.properties "$RUNNER_TEMP/release.p12"
           apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
-          got=$("$apksigner" verify --print-certs RetroRabbit-android-tv.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          certs=$("$apksigner" verify --print-certs RetroRabbit-android-tv.apk)
+          printf '%s\n' "$certs"
+          got=$(printf '%s\n' "$certs" | sed -n 's/^Signer[^:]*certificate SHA-256 digest: //p' | head -1)
           echo "Signing certificate SHA-256: $got"
           if [ "$got" != "$(tr -d '[:space:]' < android/release-cert.sha256)" ] && [ "$GITHUB_EVENT_NAME" != pull_request ]; then
             echo "::error::The APK is signed with $got, not the release key in android/release-cert.sha256"
@@ -282,7 +284,9 @@ jobs:
           cp artifacts/retrorabbit-android-tv/RetroRabbit-android-tv.apk out/
           # Only an APK signed with the release key is published.
           apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
-          got=$("$apksigner" verify --print-certs out/RetroRabbit-android-tv.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          certs=$("$apksigner" verify --print-certs out/RetroRabbit-android-tv.apk)
+          printf '%s\n' "$certs"
+          got=$(printf '%s\n' "$certs" | sed -n 's/^Signer[^:]*certificate SHA-256 digest: //p' | head -1)
           [ "$got" = "$(tr -d '[:space:]' < android/release-cert.sha256)" ] || { echo "::error::The APK is signed with $got, not the release key" >&2; exit 1; }
           (cd out && sha256sum * > SHA256SUMS.txt)
           ls -l out
