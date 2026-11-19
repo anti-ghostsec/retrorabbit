@@ -36,3 +36,9 @@ opt-level = 3
 
 [profile.dev.package."*"]
 opt-level = 2
+debug = false
+
+# Debug info: file and line numbers for our code, none for dependencies,
+# or the build folder grows by tens of gigabytes.
+[profile.dev]
+debug = "line-tables-only"
