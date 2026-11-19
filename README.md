@@ -82,6 +82,10 @@ Install `RetroRabbit-android-tv.apk` (for example with `adb install`, or a file
 manager on the TV). It shows up on the TV home screen. Allow access to videos
 and it makes channels from the TV's `Movies` and `Download` folders too.
 
+The APK is signed with RetroRabbit's release key, whose certificate SHA-256 is
+in `android/release-cert.sha256`. Earlier builds were signed with a debug key:
+if you have one of those, uninstall it once before installing a new one.
+
 | Remote button | Does |
 | --- | --- |
 | Up / Down, Channel + / − | Change channel |

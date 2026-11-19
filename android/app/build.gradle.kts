@@ -5,9 +5,11 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// Release signing: a keystore you make and keep yourself, described in
-// android/keystore.properties (never committed). Without it, release builds
-// are signed with the debug key so they still install for testing.
+// Release signing: the release keystore, described in android/keystore.properties
+// (never committed; the CI writes it from the repository's secrets). Without it,
+// local release builds are signed with the debug key so they still install for
+// testing, but the CI refuses to build or publish an APK that isn't signed with
+// the key in android/release-cert.sha256.
 val keystoreProps = Properties().apply {
     val f = rootProject.file("keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }
