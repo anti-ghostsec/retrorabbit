@@ -82,6 +82,9 @@ pub struct RetroRabbit {
     /// Android: show the on-screen Menu button until then (egui time).
     #[cfg_attr(not(target_os = "android"), allow(dead_code))]
     menu_hint_until: f64,
+    /// Android: how far the current touch drag has moved (a swipe changes channel).
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    swipe: egui::Vec2,
 }
 
 impl RetroRabbit {
@@ -156,6 +159,7 @@ impl RetroRabbit {
             focus_toolbar: false,
             guide_opening: false,
             menu_hint_until: 12.0,
+            swipe: egui::Vec2::ZERO,
         };
         app.lineup.channels = schedule::auto_lineup(&[], &app.lineup.media_roots);
         app.rescan();
@@ -194,12 +198,15 @@ impl RetroRabbit {
         if resp.is_pointer_button_down_on() || resp.dragged() {
             self.menu_hint_until = self.time + 4.0;
         }
+        // egui only reports a drag's total while it lasts: add it up ourselves.
+        if resp.dragged() {
+            self.swipe += resp.drag_delta();
+        }
         if resp.drag_stopped() {
-            if let Some(d) = resp.total_drag_delta() {
-                if d.y.abs() > 60.0 && d.y.abs() > d.x.abs() * 1.5 {
-                    self.step(if d.y < 0.0 { 1 } else { -1 });
-                    return;
-                }
+            let d = std::mem::take(&mut self.swipe);
+            if d.y.abs() > 60.0 && d.y.abs() > d.x.abs() * 1.5 {
+                self.step(if d.y < 0.0 { 1 } else { -1 });
+                return;
             }
         }
         if resp.long_touched() {
@@ -778,7 +785,9 @@ impl RetroRabbit {
     fn tv(&mut self, ui: &mut Ui, wall: f64) {
         let full = ui.available_rect_before_wrap();
         // Touch screens: tap, long-press and swipe on the picture (see tv_touch).
-        let sense = if cfg!(target_os = "android") { Sense::click_and_drag() } else { Sense::click() };
+        // Not focusable there, or the remote's first arrow press would focus the
+        // picture (behind any window) instead of the first button.
+        let sense = if cfg!(target_os = "android") { Sense::CLICK | Sense::DRAG } else { Sense::click() };
         let resp = ui.allocate_rect(full, sense);
         if resp.double_clicked() && cfg!(not(target_os = "android")) {
             let ctx = ui.ctx().clone();
