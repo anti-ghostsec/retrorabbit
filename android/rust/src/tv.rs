@@ -6,8 +6,7 @@
 
 use crate::android;
 use crate::app::RetroRabbit;
-use eframe::egui::output::OutputEvent;
-use eframe::egui::{self, Event, Key, Modifiers, Role};
+use eframe::egui::{self, Event, Key, Modifiers};
 use winit::platform::android::activity::AndroidApp;
 use winit::platform::android::activity::input::{TextInputState, TextSpan};
 
@@ -31,39 +30,6 @@ impl eframe::App for TvApp {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         self.inner.ui(ui, frame);
         let ctx = ui.ctx().clone();
-
-        // A text box got focus: hand its text to the keyboard so it can be edited.
-        // A text box got focus: hand its text to the keyboard so it can be edited.
-        // (egui reports a box's text with FocusGained, Clicked or, when the cursor
-        // is placed in the same frame, TextSelectionChanged.)
-        let events = ctx.output(|o| o.events.clone());
-        let focused = ctx.memory(|m| m.focused());
-        for e in events {
-            let info = match e {
-                OutputEvent::FocusGained(i) | OutputEvent::Clicked(i) | OutputEvent::TextSelectionChanged(i) => i,
-                _ => continue,
-            };
-            if info.role != Role::TextInput || focused.is_none() || focused == self.ime_for {
-                continue;
-            }
-            let text = info.current_text_value.unwrap_or_default();
-            // Passphrase boxes report dots, not the text: start those empty.
-            let text = if text.chars().all(|c| c == '•') { String::new() } else { text };
-            log::info!("keyboard for text box {:?}", info.label.as_deref().unwrap_or(""));
-            let n = text.len();
-            self.app.set_text_input_state(TextInputState {
-                text: text.clone(),
-                selection: TextSpan { start: n, end: n },
-                compose_region: None,
-            });
-            self.ime = Some(text);
-            self.ime_for = focused;
-        }
-        if !ctx.egui_wants_keyboard_input() {
-            self.ime = None;
-            self.ime_for = None;
-        }
-
         let now = ctx.input(|i| i.time);
         if now >= self.next_permission_check {
             self.next_permission_check = now + 1.0;
@@ -121,19 +87,45 @@ impl eframe::App for TvApp {
         }
         raw.events = keep;
 
-        // The on-screen keyboard changed the text: replace the box's text with it.
-        if let Some(last) = &self.ime {
-            let st = self.app.text_input_state();
-            if st.text != *last {
-                let key = |key, modifiers| Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers };
-                raw.events.push(key(Key::A, Modifiers { ctrl: true, command: true, ..Default::default() }));
-                if st.text.is_empty() {
-                    raw.events.push(key(Key::Backspace, Modifiers::NONE));
-                } else {
-                    raw.events.push(Event::Text(st.text.clone()));
+        // On-screen keyboard: a newly focused text box starts the keyboard empty;
+        // after that, whatever the keyboard changes is sent on as typing (new
+        // characters, and backspaces for what it took back), at egui's cursor.
+        // (egui's own per-widget events can't be relied on here: inside the
+        // guide and editor windows they never reach the root output.)
+        if typing {
+            let focused = ctx.memory(|m| m.focused());
+            if focused != self.ime_for || self.ime.is_none() {
+                self.ime_for = focused;
+                self.ime = Some(String::new());
+                self.app.set_text_input_state(TextInputState {
+                    text: String::new(),
+                    selection: TextSpan { start: 0, end: 0 },
+                    compose_region: None,
+                });
+                log::info!("keyboard for text box {focused:?}");
+            } else if let Some(last) = self.ime.clone() {
+                let now = self.app.text_input_state().text;
+                if now != last {
+                    let common = last.chars().zip(now.chars()).take_while(|(a, b)| a == b).count();
+                    for _ in common..last.chars().count() {
+                        raw.events.push(Event::Key {
+                            key: Key::Backspace,
+                            physical_key: None,
+                            pressed: true,
+                            repeat: false,
+                            modifiers: Modifiers::NONE,
+                        });
+                    }
+                    let added: String = now.chars().skip(common).collect();
+                    if !added.is_empty() {
+                        raw.events.push(Event::Text(added));
+                    }
+                    self.ime = Some(now);
                 }
-                self.ime = Some(st.text);
             }
+        } else {
+            self.ime = None;
+            self.ime_for = None;
         }
     }
 }
