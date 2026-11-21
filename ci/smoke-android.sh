@@ -36,6 +36,9 @@ key KEYCODE_BACK
 key KEYCODE_PROG_BLUE;    shot 9-channel-editor 5
 key KEYCODE_DPAD_DOWN;    shot 10-editor-dpad-focus 3
 key KEYCODE_DPAD_DOWN;    shot 10b-editor-dpad-down 3
+# Type into the Name box through the on-screen keyboard (IME), then leave it.
+adb shell input text "Toons" || true;  shot 10c-editor-typed 3
+key KEYCODE_BACK
 key KEYCODE_BACK
 # Emulator system dialogs ("isn't responding", full-screen hints) would eat the taps.
 adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null || true
@@ -45,7 +48,8 @@ adb shell input tap "$cx" "$cy";                               shot 11-tap-toolb
 adb shell input tap "$cx" "$cy";                               shot 12-tap-hide 4
 adb shell input swipe "$cx" "$cy" "$cx" "$cy" 1200;            shot 13-long-press-guide 4
 key KEYCODE_BACK
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null || true; sleep 1
 adb shell input swipe "$cx" $((h * 3 / 4)) "$cx" $((h / 4)) 300; shot 14-swipe-up 10
 adb logcat -d > "$out/logcat.txt"
-grep "focus:" "$out/logcat.txt" > "$out/focus.txt" || true
+grep -E "keyboard for text box" "$out/logcat.txt" > "$out/focus.txt" || true
 grep -E "RetroRabbit|AndroidRuntime|FATAL|libc" "$out/logcat.txt" | tail -200 > "$out/log-summary.txt" || true

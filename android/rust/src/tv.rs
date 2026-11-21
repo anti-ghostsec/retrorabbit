@@ -16,12 +16,14 @@ pub struct TvApp {
     app: AndroidApp,
     /// The focused text box's text as last given to (or taken from) the keyboard.
     ime: Option<String>,
+    /// The text box `ime` belongs to.
+    ime_for: Option<egui::Id>,
     next_permission_check: f64,
 }
 
 impl TvApp {
     pub fn new(inner: RetroRabbit, app: AndroidApp) -> Self {
-        Self { inner, app, ime: None, next_permission_check: 0.0 }
+        Self { inner, app, ime: None, ime_for: None, next_permission_check: 0.0 }
     }
 }
 
@@ -31,29 +33,35 @@ impl eframe::App for TvApp {
         let ctx = ui.ctx().clone();
 
         // A text box got focus: hand its text to the keyboard so it can be edited.
+        // A text box got focus: hand its text to the keyboard so it can be edited.
+        // (egui reports a box's text with FocusGained, Clicked or, when the cursor
+        // is placed in the same frame, TextSelectionChanged.)
         let events = ctx.output(|o| o.events.clone());
+        let focused = ctx.memory(|m| m.focused());
         for e in events {
-            if let OutputEvent::FocusGained(info) = &e {
-                // Shows in logcat (tag RetroRabbit): handy when a remote seems stuck.
-                log::info!("focus: {:?} {:?}", info.role, info.label.as_deref().unwrap_or(""));
+            let info = match e {
+                OutputEvent::FocusGained(i) | OutputEvent::Clicked(i) | OutputEvent::TextSelectionChanged(i) => i,
+                _ => continue,
+            };
+            if info.role != Role::TextInput || focused.is_none() || focused == self.ime_for {
+                continue;
             }
-            if let OutputEvent::FocusGained(info) | OutputEvent::Clicked(info) = e {
-                if info.role == Role::TextInput {
-                    let text = info.current_text_value.unwrap_or_default();
-                    // Passphrase boxes report dots, not the text: start those empty.
-                    let text = if text.chars().all(|c| c == '•') { String::new() } else { text };
-                    let n = text.len();
-                    self.app.set_text_input_state(TextInputState {
-                        text: text.clone(),
-                        selection: TextSpan { start: n, end: n },
-                        compose_region: None,
-                    });
-                    self.ime = Some(text);
-                }
-            }
+            let text = info.current_text_value.unwrap_or_default();
+            // Passphrase boxes report dots, not the text: start those empty.
+            let text = if text.chars().all(|c| c == '•') { String::new() } else { text };
+            log::info!("keyboard for text box {:?}", info.label.as_deref().unwrap_or(""));
+            let n = text.len();
+            self.app.set_text_input_state(TextInputState {
+                text: text.clone(),
+                selection: TextSpan { start: n, end: n },
+                compose_region: None,
+            });
+            self.ime = Some(text);
+            self.ime_for = focused;
         }
         if !ctx.egui_wants_keyboard_input() {
             self.ime = None;
+            self.ime_for = None;
         }
 
         let now = ctx.input(|i| i.time);
