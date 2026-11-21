@@ -81,6 +81,18 @@ pub fn take_permission_granted() -> bool {
     with(|env, act| env.call_method(act, "takePermissionGranted", "()Z", &[])?.z()).unwrap_or(false)
 }
 
+/// Pixels covered by a notch at each edge: left, top, right, bottom.
+pub fn safe_insets() -> [i32; 4] {
+    with(|env, act| {
+        let arr = env.call_method(act, "safeInsets", "()[I", &[])?.l()?;
+        let arr = jni::objects::JIntArray::from(arr);
+        let mut v = [0i32; 4];
+        env.get_int_array_region(&arr, 0, &mut v)?;
+        Ok(v)
+    })
+    .unwrap_or([0; 4])
+}
+
 pub fn set_egui(ctx: &eframe::egui::Context) {
     let _ = EGUI.set(ctx.clone());
 }

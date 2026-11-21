@@ -7,6 +7,10 @@ import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.google.androidgamesdk.GameActivity
 import org.json.JSONObject
 
@@ -17,10 +21,21 @@ import org.json.JSONObject
  */
 class MainActivity : GameActivity() {
     @Volatile private var permissionGranted = false
+    /** Pixels at each edge (left, top, right, bottom) covered by notches or system bars. */
+    @Volatile private var insets = IntArray(4)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Phones: full screen, with the status and navigation bars hidden until a
+        // swipe from the edge (Android 15 otherwise draws the app under them).
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        ViewCompat.setOnApplyWindowInsetsListener(window.decorView) { v, wi ->
+            val i = wi.getInsets(WindowInsetsCompat.Type.displayCutout())
+            insets = intArrayOf(i.left, i.top, i.right, i.bottom)
+            ViewCompat.onApplyWindowInsets(v, wi)
+        }
+        hideSystemBars()
         val perm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_VIDEO
                    else Manifest.permission.READ_EXTERNAL_STORAGE
         if (checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) {
@@ -32,6 +47,21 @@ class MainActivity : GameActivity() {
         super.onRequestPermissionsResult(code, perms, results)
         if (results.any { it == PackageManager.PERMISSION_GRANTED }) permissionGranted = true
     }
+
+    private fun hideSystemBars() {
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()
+    }
+
+    /** Called from Rust each frame: the edges egui should keep its buttons away from. */
+    fun safeInsets(): IntArray = insets
 
     /** Called from Rust about once a second. */
     fun takePermissionGranted(): Boolean {

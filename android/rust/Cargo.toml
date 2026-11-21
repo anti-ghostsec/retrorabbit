@@ -1,6 +1,6 @@
 [package]
 name = "retrorabbit-android"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "RetroRabbit for Android TV: the desktop app's code with an ExoPlayer video backend."
 license = "MIT"

@@ -231,6 +231,19 @@ jobs:
 
   android-tv-emulator:
     needs: android
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: tv
+            target: android-tv
+            arch: x86
+            profile: tv_1080p
+          - name: phone
+            target: google_apis
+            arch: x86_64
+            profile: pixel_6
+    name: android-emulator (${{ matrix.name }})
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -244,21 +257,21 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends ffmpeg </dev/null
-      - name: Smoke test on an Android TV emulator (no audio)
+      - name: Smoke test on an Android emulator (no audio)
         timeout-minutes: 30
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 34
-          target: android-tv
-          arch: x86
-          profile: tv_1080p
+          target: ${{ matrix.target }}
+          arch: ${{ matrix.arch }}
+          profile: ${{ matrix.profile }}
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim -camera-back none
           script: ci/smoke-android.sh RetroRabbit-android-tv.apk smoke
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: smoke-android-tv
+          name: smoke-android-${{ matrix.name }}
           path: smoke
 
   # A v* tag publishes a GitHub release with every platform's download.

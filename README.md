@@ -76,7 +76,7 @@ unzip it and move RetroRabbit to Applications. libmpv and ffprobe are inside the
 app. It isn't notarized, so the first time, right-click it and choose **Open**.
 It needs macOS 15 (Sequoia) or newer.
 
-### Android TV
+### Android TV (and phones)
 
 Install `RetroRabbit-android-tv.apk` (for example with `adb install`, or a file
 manager on the TV). It shows up on the TV home screen. Allow access to videos
@@ -96,7 +96,12 @@ if you have one of those, uninstall it once before installing a new one.
 | Info | What's on |
 | Red / Green / Yellow / Blue | Like / favorite channel / favorites only / channel editor |
 
-In the channel editor, choosing a text box brings up the TV's keyboard.
+On a phone or tablet: tap the picture for the toolbar (tap again to hide it),
+long-press for the TV guide, and swipe up or down to change channel. A **Menu**
+button shows in the corner for a few seconds after start and after each touch.
+
+In the channel editor, choosing a text box brings up the keyboard. With a remote,
+the arrows move between buttons and OK presses them.
 
 ### Linux
 

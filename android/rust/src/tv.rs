@@ -63,14 +63,43 @@ impl eframe::App for TvApp {
     }
 
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        // Keep the toolbar and windows clear of notches (egui only knows them on iOS).
+        let [l, t, r, b] = android::safe_insets();
+        let ppp = ctx.pixels_per_point();
+        raw.safe_area_insets = Some(egui::SafeAreaInsets(egui::epaint::MarginF32 {
+            left: l as f32 / ppp,
+            top: t as f32 / ppp,
+            right: r as f32 / ppp,
+            bottom: b as f32 / ppp,
+        }));
+
         let typing = ctx.egui_wants_keyboard_input();
+        // A drop-down is open: Back closes just that (egui does it on Esc).
+        let popup = egui::Popup::is_any_open(ctx);
+        // Remotes have no Tab: in a menu with nothing focused, the first arrow
+        // press focuses the first button, then the arrows move between them.
+        let nothing_focused = ctx.memory(|m| m.focused().is_none());
+        let menus = self.inner.tv_menus_open();
         let mut keep = Vec::with_capacity(raw.events.len());
         for e in raw.events.drain(..) {
             match &e {
+                Event::Key { key: Key::Escape, .. } if popup => {}
                 Event::Key { key: Key::Escape, pressed, .. } => {
                     if *pressed {
                         self.inner.tv_back();
                     }
+                    continue;
+                }
+                Event::Key { key: Key::ArrowUp | Key::ArrowDown | Key::ArrowLeft | Key::ArrowRight, pressed, .. }
+                    if menus && nothing_focused && !typing =>
+                {
+                    keep.push(Event::Key {
+                        key: Key::Tab,
+                        physical_key: None,
+                        pressed: *pressed,
+                        repeat: false,
+                        modifiers: Modifiers::NONE,
+                    });
                     continue;
                 }
                 Event::Key { key: Key::Enter, pressed: true, .. } if !typing && self.inner.tv_ok() => continue,

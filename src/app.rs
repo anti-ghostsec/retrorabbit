@@ -79,6 +79,9 @@ pub struct RetroRabbit {
     focus_toolbar: bool,
     /// The guide was opened this frame.
     guide_opening: bool,
+    /// Android: show the on-screen Menu button until then (egui time).
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    menu_hint_until: f64,
 }
 
 impl RetroRabbit {
@@ -152,6 +155,7 @@ impl RetroRabbit {
             saved_to_disk: false,
             focus_toolbar: false,
             guide_opening: false,
+            menu_hint_until: 12.0,
         };
         app.lineup.channels = schedule::auto_lineup(&[], &app.lineup.media_roots);
         app.rescan();
@@ -174,6 +178,55 @@ impl RetroRabbit {
             self.fullscreen = true;
         } else {
             self.tune(self.previous);
+        }
+    }
+
+    /// Toolbar, guide or channel editor showing (so the arrows move between buttons).
+    #[cfg(target_os = "android")]
+    pub fn tv_menus_open(&self) -> bool {
+        !self.fullscreen || self.show_guide || self.show_editor
+    }
+
+    /// Touch: tap the picture for the toolbar (tap again to hide it), long-press
+    /// for the TV guide, swipe up/down to change channel.
+    #[cfg(target_os = "android")]
+    fn tv_touch(&mut self, resp: &egui::Response) {
+        if resp.is_pointer_button_down_on() || resp.dragged() {
+            self.menu_hint_until = self.time + 4.0;
+        }
+        if resp.drag_stopped() {
+            if let Some(d) = resp.total_drag_delta() {
+                if d.y.abs() > 60.0 && d.y.abs() > d.x.abs() * 1.5 {
+                    self.step(if d.y < 0.0 { 1 } else { -1 });
+                    return;
+                }
+            }
+        }
+        if resp.long_touched() {
+            self.show_guide = true;
+            self.guide_opening = true;
+        } else if resp.clicked() {
+            self.fullscreen = !self.fullscreen;
+        }
+    }
+
+    /// While watching, a Menu button sits in the corner for a few seconds after
+    /// start-up and after each touch, so the toolbar is always findable.
+    #[cfg(target_os = "android")]
+    fn tv_menu_button(&mut self, ui: &mut Ui, screen: Rect) {
+        if !self.fullscreen || self.show_guide || self.show_editor || self.time > self.menu_hint_until {
+            return;
+        }
+        ui.ctx().request_repaint_after(std::time::Duration::from_millis(500));
+        let r = Rect::from_min_size(screen.left_top() + vec2(16.0, 16.0), vec2(150.0, 44.0));
+        let resp = ui.interact(r, ui.id().with("rr-menu-button"), Sense::click());
+        let p = ui.painter();
+        p.rect_filled(r, 0.0, FACE);
+        win95::bevel(p, r, !resp.is_pointer_button_down_on());
+        p.text(r.center(), Align2::CENTER_CENTER, "Menu (OK)", FontId::proportional(18.0), BLACK);
+        if resp.clicked() {
+            self.fullscreen = false;
+            self.focus_toolbar = true;
         }
     }
 
@@ -724,11 +777,15 @@ impl RetroRabbit {
 
     fn tv(&mut self, ui: &mut Ui, wall: f64) {
         let full = ui.available_rect_before_wrap();
-        let resp = ui.allocate_rect(full, Sense::click());
-        if resp.double_clicked() {
+        // Touch screens: tap, long-press and swipe on the picture (see tv_touch).
+        let sense = if cfg!(target_os = "android") { Sense::click_and_drag() } else { Sense::click() };
+        let resp = ui.allocate_rect(full, sense);
+        if resp.double_clicked() && cfg!(not(target_os = "android")) {
             let ctx = ui.ctx().clone();
             self.toggle_fullscreen(&ctx);
         }
+        #[cfg(target_os = "android")]
+        self.tv_touch(&resp);
         let screen = if self.fullscreen {
             full
         } else {
@@ -824,6 +881,8 @@ impl RetroRabbit {
             self.banner_pending = false;
             self.show_banner(wall);
         }
+        #[cfg(target_os = "android")]
+        self.tv_menu_button(ui, screen);
         if !self.digits.is_empty() {
             p.text(
                 screen.left_top() + vec2(30.0, 30.0),
