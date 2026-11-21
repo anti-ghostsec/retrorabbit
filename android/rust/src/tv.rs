@@ -33,6 +33,10 @@ impl eframe::App for TvApp {
         // A text box got focus: hand its text to the keyboard so it can be edited.
         let events = ctx.output(|o| o.events.clone());
         for e in events {
+            if let OutputEvent::FocusGained(info) = &e {
+                // Shows in logcat (tag RetroRabbit): handy when a remote seems stuck.
+                log::info!("focus: {:?} {:?}", info.role, info.label.as_deref().unwrap_or(""));
+            }
             if let OutputEvent::FocusGained(info) | OutputEvent::Clicked(info) = e {
                 if info.role == Role::TextInput {
                     let text = info.current_text_value.unwrap_or_default();
