@@ -23,8 +23,8 @@ android {
         applicationId = "org.retrorabbit.tv"
         minSdk = 28
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
     }
 
     signingConfigs {
