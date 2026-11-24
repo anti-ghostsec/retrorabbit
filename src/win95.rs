@@ -101,7 +101,7 @@ pub fn button_ex(ui: &mut Ui, text: &str, on: bool, min_width: f32) -> Response 
 }
 
 /// Navy-to-blue gradient title strip.
-pub fn title_bar(ui: &mut Ui, text: &str) {
+pub fn title_bar(ui: &mut Ui, text: &str) -> Rect {
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width().max(0.0), 22.0), Sense::hover());
     let p = ui.painter();
     let steps = 24;
@@ -119,6 +119,29 @@ pub fn title_bar(ui: &mut Ui, text: &str) {
         FontId::proportional(14.0),
         WHITE,
     );
+    rect
+}
+
+/// Title strip with a Win95 close box ("X") at its right end, for windows drawn
+/// inside the main one (Android), which have no title bar of the system's own.
+/// True when the close box was pressed.
+pub fn title_bar_close(ui: &mut Ui, text: &str) -> bool {
+    let bar = title_bar(ui, text);
+    // The box is drawn 22×18 but takes touches over a thumb-sized area around it.
+    let r = Rect::from_center_size(pos2(bar.max.x - 15.0, bar.center().y), vec2(44.0, 34.0));
+    let face = Rect::from_center_size(r.center(), vec2(22.0, 18.0));
+    let resp = ui.interact(r, ui.scope_id().with(("rr-close", text)), Sense::click());
+    let p = ui.painter();
+    p.rect_filled(face, 0.0, FACE);
+    bevel(p, face, !resp.is_pointer_button_down_on());
+    let c = face.center() + if resp.is_pointer_button_down_on() { vec2(1.0, 1.0) } else { vec2(0.0, 0.0) };
+    let s = Stroke::new(2.0, BLACK);
+    p.line_segment([c + vec2(-4.0, -4.0), c + vec2(4.0, 4.0)], s);
+    p.line_segment([c + vec2(-4.0, 4.0), c + vec2(4.0, -4.0)], s);
+    if resp.has_focus() {
+        p.rect_stroke(face.shrink(2.0), 0.0, Stroke::new(1.0, BLACK), egui::StrokeKind::Inside);
+    }
+    resp.clicked()
 }
 
 /// A captioned, etched group box like Win95 property sheets.

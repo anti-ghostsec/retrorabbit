@@ -99,6 +99,10 @@ if you have one of those, uninstall it once before installing a new one.
 On a phone or tablet: tap the picture for the toolbar (tap again to hide it),
 long-press for the TV guide, and swipe up or down to change channel. A **Menu**
 button shows in the corner for a few seconds after start and after each touch.
+The TV guide and channel editor fill the screen and close with the **X** at the
+right of their title strip (or Back). Hold the phone upright or sideways: the
+picture fits either way, and upright the channel editor puts the channel list
+above the details.
 
 In the channel editor, choosing a text box brings up the keyboard. With a remote,
 the arrows move between buttons and OK presses them.

@@ -932,9 +932,11 @@ impl RetroRabbit {
     // ---- TV guide ------------------------------------------------------------
 
     fn guide_window(&mut self, ctx: &egui::Context, wall: f64) {
-        let builder = ViewportBuilder::default()
-            .with_title("TV Guide – RetroRabbit")
-            .with_inner_size([900.0, 560.0]);
+        let builder = fit_embedded(
+            ctx,
+            ViewportBuilder::default().with_title("TV Guide – RetroRabbit").with_inner_size([900.0, 560.0]),
+        );
+        let embedded = ctx.embed_viewports();
         ctx.show_viewport_immediate(ViewportId::from_hash_of("rr-guide"), builder, |ui, _| {
             // Where the guide is drawn inside the main window (a TV), the G that
             // opened it is still pressed this frame: don't let it close it again.
@@ -947,7 +949,13 @@ impl RetroRabbit {
             egui::CentralPanel::default()
                 .frame(egui::Frame::new().fill(FACE).inner_margin(6))
                 .show(ui, |ui| {
-                    win95::title_bar(ui, "TV Guide");
+                    if embedded {
+                        if win95::title_bar_close(ui, "TV Guide") {
+                            self.show_guide = false;
+                        }
+                    } else {
+                        win95::title_bar(ui, "TV Guide");
+                    }
                     ui.add_space(4.0);
                     ui.horizontal_wrapped(|ui| {
                         if win95::button(ui, "< Earlier").clicked() {
@@ -978,7 +986,8 @@ impl RetroRabbit {
         let span = self.guide_span;
         let start = (wall / 1800.0).floor() * 1800.0 + self.guide_page as f64 * span;
         let end = start + span;
-        let name_w = 180.0;
+        // Narrow (upright phone): give the programs more of the width.
+        let name_w = (ui.available_width() * 0.3).clamp(90.0, 180.0);
         let row_h = 38.0;
 
         let area = ui.available_rect_before_wrap();
@@ -1112,22 +1121,46 @@ impl RetroRabbit {
     // ---- channel editor --------------------------------------------------------
 
     fn editor_window(&mut self, ctx: &egui::Context) {
-        let builder = ViewportBuilder::default()
-            .with_title("Channels – RetroRabbit")
-            .with_inner_size([860.0, 640.0]);
+        let builder = fit_embedded(
+            ctx,
+            ViewportBuilder::default().with_title("Channels – RetroRabbit").with_inner_size([860.0, 640.0]),
+        );
+        let embedded = ctx.embed_viewports();
         ctx.show_viewport_immediate(ViewportId::from_hash_of("rr-editor"), builder, |ui, _| {
             if ui.ctx().input(|i| i.viewport().close_requested()) {
                 self.show_editor = false;
             }
-            egui::Panel::left("ed-list")
-                .resizable(false)
-                .exact_size(230.0)
-                .frame(egui::Frame::new().fill(FACE).inner_margin(6))
-                .show(ui, |ui| self.editor_list(ui));
+            // Drawn inside the main screen (Android): a title strip with a close box,
+            // since there is no window frame of the system's own to close it with.
+            if embedded {
+                egui::Panel::top("ed-title")
+                    .frame(egui::Frame::new().fill(FACE).inner_margin(egui::Margin { left: 6, right: 6, top: 6, bottom: 0 }))
+                    .show(ui, |ui| {
+                        if win95::title_bar_close(ui, "Channels") {
+                            self.show_editor = false;
+                        }
+                    });
+            }
+            // Upright phone: the channel list above the details, not beside them.
+            let narrow = ui.available_width() < 600.0;
+            if narrow {
+                egui::Panel::top("ed-list-top")
+                    .resizable(false)
+                    .exact_size((ui.available_height() * 0.42).max(220.0))
+                    .frame(egui::Frame::new().fill(FACE).inner_margin(6))
+                    .show(ui, |ui| self.editor_list(ui));
+            } else {
+                egui::Panel::left("ed-list")
+                    .resizable(false)
+                    .exact_size(230.0)
+                    .frame(egui::Frame::new().fill(FACE).inner_margin(6))
+                    .show(ui, |ui| self.editor_list(ui));
+            }
             egui::CentralPanel::default()
                 .frame(egui::Frame::new().fill(FACE).inner_margin(6))
                 .show(ui, |ui| {
-                    egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| self.editor_detail(ui));
+                    let scroll = if narrow { egui::ScrollArea::both() } else { egui::ScrollArea::vertical() };
+                    scroll.auto_shrink(false).show(ui, |ui| self.editor_detail(ui));
                 });
         });
     }
@@ -1461,6 +1494,25 @@ impl eframe::App for RetroRabbit {
             ctx.request_repaint_after(std::time::Duration::from_millis(250));
         }
     }
+}
+
+/// Where the guide and channel editor are drawn inside the main window (Android,
+/// which has no separate windows), they fill the screen inside the notches,
+/// whichever way up it is held, and draw their own title strip with a close box.
+fn fit_embedded(ctx: &egui::Context, builder: ViewportBuilder) -> ViewportBuilder {
+    if !ctx.embed_viewports() {
+        return builder;
+    }
+    // content_rect is the screen less the notches. Leave room for the window's frame.
+    let screen = ctx.content_rect();
+    let size = vec2((screen.width() - 24.0).max(200.0), (screen.height() - 24.0).max(200.0));
+    builder
+        .with_decorations(false)
+        .with_resizable(false)
+        .with_minimize_button(false)
+        .with_inner_size(size)
+        .with_min_inner_size(size)
+        .with_max_inner_size(size)
 }
 
 /// Text box with a drop-down of suggestions (tag values found in your media).
